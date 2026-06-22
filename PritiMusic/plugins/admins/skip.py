@@ -48,18 +48,16 @@ async def skip(cli, message: Message, _, chat_id):
                             if popped:
                                 await auto_clean(popped)
                             if not check:
+                                # 🔄 AUTOPLAY TRIGGER FOR MANUAL MULTI-SKIP
                                 try:
                                     await message.reply_text(
-                                        text=_["admin_6"].format(
-                                            message.from_user.mention,
-                                            message.chat.title,
-                                        ),
+                                        text="🔄 **Skipped to end of queue. Triggering Autoplay...**",
                                         reply_markup=close_markup(_),
                                     )
-                                    await Lucky.stop_stream(chat_id)
+                                    return await Lucky.change_stream(cli, chat_id)
                                 except:
                                     return
-                                break
+                        break
                     else:
                         return await message.reply_text(_["admin_11"].format(count))
                 else:
@@ -76,27 +74,27 @@ async def skip(cli, message: Message, _, chat_id):
             if popped:
                 await auto_clean(popped)
             if not check:
-                await message.reply_text(
-                    text=_["admin_6"].format(
-                        message.from_user.mention, message.chat.title
-                    ),
-                    reply_markup=close_markup(_),
-                )
+                # 🔄 AUTOPLAY TRIGGER FOR MANUAL SKIP ON LAST TRACK
                 try:
-                    return await Lucky.stop_stream(chat_id)
+                    await message.reply_text(
+                        text="🔄 **Queue is empty! Triggering Autoplay...**",
+                        reply_markup=close_markup(_),
+                    )
+                    return await Lucky.change_stream(cli, chat_id)
                 except:
                     return
         except:
+            # 🔄 AUTOPLAY TRIGGER FOR FAILSAFE
             try:
                 await message.reply_text(
-                    text=_["admin_6"].format(
-                        message.from_user.mention, message.chat.title
-                    ),
+                    text="🔄 **Queue exhausted! Triggering Autoplay...**",
                     reply_markup=close_markup(_),
                 )
-                return await Lucky.stop_stream(chat_id)
+                return await Lucky.change_stream(cli, chat_id)
             except:
                 return
+    
+    # ⏭️ IF QUEUE IS NOT EMPTY, CONTINUE WITH NEXT SONG
     queued = check[0]["file"]
     title = (check[0]["title"]).title()
     user = check[0]["by"]
@@ -110,6 +108,7 @@ async def skip(cli, message: Message, _, chat_id):
         db[chat_id][0]["seconds"] = check[0]["old_second"]
         db[chat_id][0]["speed_path"] = None
         db[chat_id][0]["speed"] = 1.0
+        
     if "live_" in queued:
         n, link = await YouTube.video(videoid, True)
         if n == 0:
@@ -124,10 +123,8 @@ async def skip(cli, message: Message, _, chat_id):
             return await message.reply_text(_["call_6"])
         button = stream_markup2(_, chat_id)
         
-        # ✅ FIX: Added missing user_id and user_name arguments
+        # ✅ Safe Random Image Fetch
         img = await get_thumb(videoid, message.from_user.id, message.from_user.first_name)
-        
-        # ✅ Fallback Random Image
         if not img: img = get_random_img(config.PLAYLIST_IMG_URL)
 
         run = await message.reply_photo(
@@ -139,10 +136,11 @@ async def skip(cli, message: Message, _, chat_id):
                 user,
             ),
             reply_markup=InlineKeyboardMarkup(button),
-            has_spoiler=False # ✨ Spoiler Removed
+            has_spoiler=False 
         )
         db[chat_id][0]["mystic"] = run
         db[chat_id][0]["markup"] = "tg"
+        
     elif "vid_" in queued:
         mystic = await message.reply_text(_["call_7"], disable_web_page_preview=True)
         try:
@@ -164,10 +162,8 @@ async def skip(cli, message: Message, _, chat_id):
             return await mystic.edit_text(_["call_6"])
         button = stream_markup(_, chat_id)
         
-        # ✅ FIX: Added missing user_id and user_name arguments
+        # ✅ Safe Random Image Fetch
         img = await get_thumb(videoid, message.from_user.id, message.from_user.first_name)
-        
-        # ✅ Fallback Random Image
         if not img: img = get_random_img(config.PLAYLIST_IMG_URL)
 
         run = await message.reply_photo(
@@ -179,11 +175,12 @@ async def skip(cli, message: Message, _, chat_id):
                 user,
             ),
             reply_markup=InlineKeyboardMarkup(button),
-            has_spoiler=False # ✨ Spoiler Removed
+            has_spoiler=False 
         )
         db[chat_id][0]["mystic"] = run
         db[chat_id][0]["markup"] = "stream"
         await mystic.delete()
+        
     elif "index_" in queued:
         try:
             await Lucky.skip_stream(chat_id, videoid, video=status)
@@ -196,10 +193,11 @@ async def skip(cli, message: Message, _, chat_id):
             photo=get_random_img(config.STREAM_IMG_URL),
             caption=_["stream_2"].format(user),
             reply_markup=InlineKeyboardMarkup(button),
-            has_spoiler=False # ✨ Spoiler Removed
+            has_spoiler=False 
         )
         db[chat_id][0]["mystic"] = run
         db[chat_id][0]["markup"] = "tg"
+        
     else:
         if videoid == "telegram":
             image = None
@@ -214,10 +212,9 @@ async def skip(cli, message: Message, _, chat_id):
             await Lucky.skip_stream(chat_id, queued, video=status, image=image)
         except:
             return await message.reply_text(_["call_6"])
+            
         if videoid == "telegram":
             button = stream_markup2(_, chat_id)
-            
-            # ✅ Random Telegram Image
             tg_img = get_random_img(config.TELEGRAM_AUDIO_URL) if str(streamtype) == "audio" else get_random_img(config.TELEGRAM_VIDEO_URL)
 
             run = await message.reply_photo(
@@ -226,14 +223,13 @@ async def skip(cli, message: Message, _, chat_id):
                     config.SUPPORT_CHAT, title[:23], check[0]["dur"], user
                 ),
                 reply_markup=InlineKeyboardMarkup(button),
-                has_spoiler=False # ✨ Spoiler Removed
+                has_spoiler=False 
             )
             db[chat_id][0]["mystic"] = run
             db[chat_id][0]["markup"] = "tg"
+            
         elif videoid == "soundcloud":
             button = stream_markup2(_, chat_id)
-            
-            # ✅ Random SoundCloud Image
             sc_img = get_random_img(config.SOUNCLOUD_IMG_URL) if str(streamtype) == "audio" else get_random_img(config.TELEGRAM_VIDEO_URL)
 
             run = await message.reply_photo(
@@ -242,17 +238,14 @@ async def skip(cli, message: Message, _, chat_id):
                     config.SUPPORT_CHAT, title[:23], check[0]["dur"], user
                 ),
                 reply_markup=InlineKeyboardMarkup(button),
-                has_spoiler=False # ✨ Spoiler Removed
+                has_spoiler=False 
             )
             db[chat_id][0]["mystic"] = run
             db[chat_id][0]["markup"] = "tg"
+            
         else:
             button = stream_markup(_, chat_id)
-            
-            # ✅ FIX: Added missing user_id and user_name arguments
             img = await get_thumb(videoid, message.from_user.id, message.from_user.first_name)
-            
-            # ✅ Fallback Random Image
             if not img: img = get_random_img(config.PLAYLIST_IMG_URL)
 
             run = await message.reply_photo(
@@ -264,7 +257,7 @@ async def skip(cli, message: Message, _, chat_id):
                     user,
                 ),
                 reply_markup=InlineKeyboardMarkup(button),
-                has_spoiler=False # ✨ Spoiler Removed
+                has_spoiler=False 
             )
             db[chat_id][0]["mystic"] = run
             db[chat_id][0]["markup"] = "stream"
