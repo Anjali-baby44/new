@@ -53,18 +53,16 @@ async def skip(cli, message: Message, _, chat_id):
                             if popped:
                                 await auto_clean(popped)
                             if not check:
+                                # 🔄 AUTOPLAY TRIGGER FOR MANUAL MULTI-SKIP IN CLONES
                                 try:
                                     await message.reply_text(
-                                        text=_["admin_6"].format(
-                                            message.from_user.mention,
-                                            message.chat.title,
-                                        ),
+                                        text="🔄 **Skipped to end of queue. Triggering Autoplay...**",
                                         reply_markup=close_markup(_),
                                     )
-                                    await Lucky.stop_stream(chat_id)
+                                    return await Lucky.change_stream(cli, chat_id)
                                 except:
-                                    pass
-                                return
+                                    return
+                        break
                     else:
                         return await message.reply_text(_["admin_11"].format(count))
                 else:
@@ -81,25 +79,23 @@ async def skip(cli, message: Message, _, chat_id):
             if popped:
                 await auto_clean(popped)
             if not check:
-                await message.reply_text(
-                    text=_["admin_6"].format(
-                        message.from_user.mention, message.chat.title
-                    ),
-                    reply_markup=close_markup(_),
-                )
+                # 🔄 AUTOPLAY TRIGGER FOR MANUAL SKIP ON LAST TRACK IN CLONES
                 try:
-                    return await Lucky.stop_stream(chat_id)
+                    await message.reply_text(
+                        text="🔄 **Queue is empty! Triggering Autoplay...**",
+                        reply_markup=close_markup(_),
+                    )
+                    return await Lucky.change_stream(cli, chat_id)
                 except:
                     return
         except:
+            # 🔄 AUTOPLAY TRIGGER FOR FAILSAFE IN CLONES
             try:
                 await message.reply_text(
-                    text=_["admin_6"].format(
-                        message.from_user.mention, message.chat.title
-                    ),
+                    text="🔄 **Queue exhausted! Triggering Autoplay...**",
                     reply_markup=close_markup(_),
                 )
-                return await Lucky.stop_stream(chat_id)
+                return await Lucky.change_stream(cli, chat_id)
             except:
                 return
     
