@@ -57,7 +57,6 @@ async def skip(cli, message: Message, _, chat_id):
                                     return await Lucky.change_stream(cli, chat_id)
                                 except:
                                     return
-                        break
                     else:
                         return await message.reply_text(_["admin_11"].format(count))
                 else:
