@@ -183,7 +183,6 @@ class Call(PyTgCalls):
         else:
             out = file_path
         
-        # ✅ FIX: Use get_running_loop() for newer Python versions
         try:
             loop = asyncio.get_running_loop()
         except RuntimeError:
@@ -392,12 +391,107 @@ class Call(PyTgCalls):
                 loop = loop - 1
                 await set_loop(chat_id, loop)
             await auto_clean(popped)
+
+            # ==========================================
+            # 🔄 AUTOPLAY BLOCK 
+            # ==========================================
             if not check:
+                from PritiMusic.utils.database.autoplay import is_autoplay_group
+                try:
+                    auto_on = await is_autoplay_group(chat_id)
+                except:
+                    auto_on = False
+
+                if auto_on and popped:
+                    LOGGER(__name__).info(f"🔄 Autoplay active searching next song for {chat_id}")
+                    raw_title = popped.get("title", "Unknown Title")
+                    title_lower = str(raw_title).lower()
+                    last_vidid = str(popped.get("vidid", ""))
+
+                    keywords_map = {
+                        "Punjabi": ["sidhu moose wala", "karan aujla", "diljit dosanjh", "ap dhillon", "shubh", "kaka", "hardy sandhu", "guru randhawa", "b praak", "jass manak"],
+                        "Bhojpuri": ["pawan singh", "khesari lal yadav", "shilpi raj", "antra singh", "pramod premi", "ritesh pandey", "arvind akela kallu", "gunjan singh"],
+                        "Haryanvi": ["sapna choudhary", "renuka panwar", "gulzaar chhaniwala", "sumit goswami", "raju punjabi", "amit saini rohtakiya", "pranjal dahiya"],
+                        "Hindi": ["arijit singh", "neha kakkar", "shreya ghoshal", "jubin nautiyal", "atif aslam", "darshan raval", "armaan malik", "sonu nigam", "yo yo honey singh", "badshah", "sunidhi chauhan", "udit narayan", "kumar sanu", "alka yagnik", "sachet tandon", "parampara", "bollywood"],
+                        "Tamil": ["anirudh", "ar rahman", "rahman", "yuvan shankar raja", "sid sriram", "harris jayaraj", "vijay prakash", "s.p. balasubrahmanyam", "kollywood"],
+                        "Telugu": ["devi sri prasad", "dsp", "thaman", "sid sriram", "anurag kulkarni", "mangli", "geetha madhuri", "allu", "ramarao", "tollywood"],
+                        "English": ["taylor swift", "justin bieber", "ed sheeran", "ariana grande", "the weeknd", "drake", "eminem", "billie eilish", "dua lipa", "bruno mars", "post malone", "pop song"],
+                        "Urdu": ["rahat fateh ali khan", "nusrat fateh ali khan", "ali zafar", "qurat-ul-ain balouch", "coke studio pakistan", "urdu", "ghazal"],
+                        "Kannada": ["puneeth rajkumar", "sanjith hegde", "chandan shetty", "vijay prakash", "kannada", "sandalwood"],
+                        "Myanmar": ["sai sai kham leng", "ni ni khin zaw", "lay phyu", "myanmar song", "burmese"]
+                    }
+
+                    detected_lang = "Hindi"
+                    detected_artist = None
+
+                    for lang, kws in keywords_map.items():
+                        match = next((kw for kw in kws if kw in title_lower), None)
+                        if match:
+                            detected_lang = lang
+                            if match not in ["bollywood", "kollywood", "tollywood", "pop song", "urdu", "ghazal", "kannada", "sandalwood", "myanmar song", "burmese"]:
+                                detected_artist = match
+                            break
+
+                    if detected_artist:
+                        search_query = random.choice([
+                            f"{detected_artist} latest hit single official video",
+                            f"{detected_artist} trending track lyrical",
+                            f"{detected_artist} superhit popular track audio",
+                            f"{detected_artist} best song official"
+                        ])
+                    else:
+                        lang_pools = {
+                            "Hindi": ["hindi single track official video", "bollywood latest lyrical hit song", "trending hindi pop music"],
+                            "Punjabi": ["latest punjabi single official video", "punjabi trending track lyrical", "punjabi pop hit track"],
+                            "Bhojpuri": ["bhojpuri latest single video song", "bhojpuri trending song official", "bhojpuri hit dj remix"],
+                            "Haryanvi": ["haryanvi single track official", "latest haryanvi video song", "haryanvi dj hit pop"],
+                            "Tamil": ["tamil latest single official video", "kollywood trending song lyrical", "tamil hit movie track"],
+                            "Telugu": ["telugu tollywood latest single song", "telugu lyrical video official", "telugu trending track"],
+                            "English": ["english pop single official music video", "trending english lyrical song", "global hit english track"],
+                            "Urdu": ["urdu latest hit song", "trending urdu song lyrical", "coke studio pakistan hit"],
+                            "Kannada": ["kannada latest single official video", "sandalwood trending song lyrical", "kannada hit movie track"],
+                            "Myanmar": ["myanmar latest single official video", "trending burmese song", "myanmar pop hit track"]
+                        }
+                        search_query = random.choice(lang_pools.get(detected_lang, lang_pools["Hindi"]))
+
+                    try:
+                        recommendation = await YouTube.autoplay(last_vidid=last_vidid, title=search_query, max_duration=900)
+                        if recommendation:
+                            db[chat_id].append({
+                                "title": str(recommendation.get("title", "Unknown Title")),
+                                "dur": recommendation.get("duration_min", "0:00"),
+                                "streamtype": popped.get("streamtype", "audio") if popped else "audio",
+                                "by": "Autoplay 🟢",
+                                "user_id": 0,
+                                "chat_id": chat_id,
+                                "file": f"vid_{recommendation.get('vidid', '')}",
+                                "vidid": str(recommendation.get("vidid", "")),
+                                "seconds": recommendation.get("duration_sec", 0),
+                                "old_dur": recommendation.get("duration_min", "0:00"),
+                                "old_second": 0,
+                                "played": 0,
+                                "client": popped.get("client", app)
+                            })
+                            
+                            # 📝 AUTOPLAY LOGGER ADDED HERE
+                            try:
+                                await app.send_message(
+                                    config.LOGGER_ID,
+                                    f"**🔄 Autoplay Triggered**\n\n**Chat ID:** `{chat_id}`\n**Queued Track:** {recommendation.get('title')}\n**Language/Genre:** {detected_lang}"
+                                )
+                            except Exception as e:
+                                pass
+
+                    except Exception as e:
+                        LOGGER(__name__).error(f"❌ Autoplay exception: {e}")
+
+            if not db.get(chat_id): # If queue is still empty after Autoplay attempt
                 await _clear_(chat_id)
                 if chat_id in self.active_clients:
                     del self.active_clients[chat_id]
                 return await client.leave_group_call(chat_id)
-        except:
+
+        except Exception as e:
             try:
                 await _clear_(chat_id)
                 if chat_id in self.active_clients:
@@ -406,35 +500,36 @@ class Call(PyTgCalls):
             except:
                 return
         else:
-            queued = check[0]["file"]
+            queued = db[chat_id][0]["file"]
             language = await get_lang(chat_id)
             _ = get_string(language)
-            title = (check[0]["title"]).title()
-            user = check[0]["by"]
-            user_id = check[0].get("user_id", 0) # Safely fetch user_id for get_thumb
-            original_chat_id = check[0]["chat_id"]
-            streamtype = check[0]["streamtype"]
-            videoid = check[0]["vidid"]
+            title = (db[chat_id][0]["title"]).title()
+            user = db[chat_id][0]["by"]
+            user_id = db[chat_id][0].get("user_id", 0) 
+            original_chat_id = db[chat_id][0]["chat_id"]
+            streamtype = db[chat_id][0]["streamtype"]
+            videoid = db[chat_id][0]["vidid"]
             
-            chat_client = check[0].get("client")
+            chat_client = db[chat_id][0].get("client")
             if not chat_client:
                 chat_client = app
 
             db[chat_id][0]["played"] = 0
-            exis = (check[0]).get("old_dur")
+            exis = (db[chat_id][0]).get("old_dur")
             if exis:
                 db[chat_id][0]["dur"] = exis
-                db[chat_id][0]["seconds"] = check[0]["old_second"]
+                db[chat_id][0]["seconds"] = db[chat_id][0]["old_second"]
                 db[chat_id][0]["speed_path"] = None
                 db[chat_id][0]["speed"] = 1.0
             video = True if str(streamtype) == "video" else False
+            
             if "live_" in queued:
                 n, link = await YouTube.video(videoid, True)
                 if n == 0:
-                    return await chat_client.send_message(
-                        original_chat_id,
-                        text=_["call_6"],
-                    )
+                    try: await chat_client.send_message(original_chat_id, text="⚠️ **Live stream offline. Auto-skipping...**")
+                    except: pass
+                    return await self.change_stream(client, chat_id) # ⏭️ AUTO-SKIP TRIGGER
+
                 if video:
                     stream = AudioVideoPiped(
                         link,
@@ -449,29 +544,30 @@ class Call(PyTgCalls):
                 try:
                     await client.change_stream(chat_id, stream)
                 except Exception:
-                    return await chat_client.send_message(
-                        original_chat_id,
-                        text=_["call_6"],
-                    )
+                    try: await chat_client.send_message(original_chat_id, text="❌ **Live stream play failed. Auto-skipping...**")
+                    except: pass
+                    return await self.change_stream(client, chat_id) # ⏭️ AUTO-SKIP TRIGGER
+
                 button = telegram_markup(_, chat_id)
-                
-                # ✅ Safe Random Image
                 img = get_random_img(config.STREAM_IMG_URL)
                 
-                run = await chat_client.send_photo(
-                    chat_id=original_chat_id,
-                    photo=img,
-                    caption=_["stream_1"].format(
-                        f"https://t.me/{app.username}?start=info_{videoid}",
-                        title[:23],
-                        check[0]["dur"],
-                        user,
-                    ),
-                    reply_markup=InlineKeyboardMarkup(button),
-                    has_spoiler=False # Spoiler Disabled
-                )
-                db[chat_id][0]["mystic"] = run
-                db[chat_id][0]["markup"] = "tg"
+                try:
+                    run = await chat_client.send_photo(
+                        chat_id=original_chat_id,
+                        photo=img,
+                        caption=_["stream_1"].format(
+                            f"https://t.me/{app.username}?start=info_{videoid}",
+                            title[:23],
+                            db[chat_id][0]["dur"],
+                            user,
+                        ),
+                        reply_markup=InlineKeyboardMarkup(button),
+                        has_spoiler=False 
+                    )
+                    db[chat_id][0]["mystic"] = run
+                    db[chat_id][0]["markup"] = "tg"
+                except:
+                    pass
                 
             elif "vid_" in queued:
                 mystic = await chat_client.send_message(original_chat_id, _["call_7"])
@@ -491,14 +587,16 @@ class Call(PyTgCalls):
                             video=True if str(streamtype) == "video" else False,
                         )
                     except:
-                        return await mystic.edit_text(
-                            _["call_6"], disable_web_page_preview=True
-                        )
+                        try: await mystic.edit_text("⚠️ **Download Failed. Auto-skipping...**", disable_web_page_preview=True)
+                        except: pass
+                        await asyncio.sleep(1.5)
+                        return await self.change_stream(client, chat_id) # ⏭️ AUTO-SKIP TRIGGER
                 
-                # ✅ FIX: CRITICAL AUTO-SKIP CRASH PREVENTION
                 if not file_path or str(file_path) == "None":
-                    await mystic.edit_text("❌ **Error:** yt-dlp failed to download the next track. Skipping...")
-                    return await self.change_stream(client, chat_id)
+                    try: await mystic.edit_text("❌ **Track unavailable or Blocked. Auto-skipping...**")
+                    except: pass
+                    await asyncio.sleep(1.5)
+                    return await self.change_stream(client, chat_id) # ⏭️ AUTO-SKIP TRIGGER
 
                 if video:
                     stream = AudioVideoPiped(
@@ -514,33 +612,36 @@ class Call(PyTgCalls):
                 try:
                     await client.change_stream(chat_id, stream)
                 except:
-                    return await chat_client.send_message(
-                        original_chat_id,
-                        text=_["call_6"],
-                    )
+                    try: await chat_client.send_message(original_chat_id, text="❌ **Play routing failed. Auto-skipping...**")
+                    except: pass
+                    return await self.change_stream(client, chat_id) # ⏭️ AUTO-SKIP TRIGGER
                 
-                # ✅ FIX: Pass all required arguments to get_thumb
                 img = await get_thumb(videoid, user_id, chat_client)
-                
-                # Fallback to random playlist image if thumb fails
                 if not img: img = get_random_img(config.PLAYLIST_IMG_URL)
 
                 button = stream_markup(_, chat_id)
-                await mystic.delete()
-                run = await chat_client.send_photo(
-                    chat_id=original_chat_id,
-                    photo=img,
-                    caption=_["stream_1"].format(
-                        f"https://t.me/{app.username}?start=info_{videoid}",
-                        title[:23],
-                        check[0]["dur"],
-                        user,
-                    ),
-                    reply_markup=InlineKeyboardMarkup(button),
-                    has_spoiler=False # Spoiler Disabled
-                )
-                db[chat_id][0]["mystic"] = run
-                db[chat_id][0]["markup"] = "stream"
+                try:
+                    await mystic.delete()
+                except:
+                    pass
+                
+                try:
+                    run = await chat_client.send_photo(
+                        chat_id=original_chat_id,
+                        photo=img,
+                        caption=_["stream_1"].format(
+                            f"https://t.me/{app.username}?start=info_{videoid}",
+                            title[:23],
+                            db[chat_id][0]["dur"],
+                            user,
+                        ),
+                        reply_markup=InlineKeyboardMarkup(button),
+                        has_spoiler=False 
+                    )
+                    db[chat_id][0]["mystic"] = run
+                    db[chat_id][0]["markup"] = "stream"
+                except:
+                    pass
                 
             elif "index_" in queued:
                 stream = (
@@ -555,20 +656,23 @@ class Call(PyTgCalls):
                 try:
                     await client.change_stream(chat_id, stream)
                 except:
-                    return await chat_client.send_message(
-                        original_chat_id,
-                        text=_["call_6"],
-                    )
+                    try: await chat_client.send_message(original_chat_id, text="❌ **Index stream failed. Auto-skipping...**")
+                    except: pass
+                    return await self.change_stream(client, chat_id) # ⏭️ AUTO-SKIP TRIGGER
+                    
                 button = telegram_markup(_, chat_id)
-                run = await chat_client.send_photo(
-                    chat_id=original_chat_id,
-                    photo=get_random_img(config.STREAM_IMG_URL),
-                    caption=_["stream_2"].format(user),
-                    reply_markup=InlineKeyboardMarkup(button),
-                    has_spoiler=False # Spoiler Disabled
-                )
-                db[chat_id][0]["mystic"] = run
-                db[chat_id][0]["markup"] = "tg"
+                try:
+                    run = await chat_client.send_photo(
+                        chat_id=original_chat_id,
+                        photo=get_random_img(config.STREAM_IMG_URL),
+                        caption=_["stream_2"].format(user),
+                        reply_markup=InlineKeyboardMarkup(button),
+                        has_spoiler=False 
+                    )
+                    db[chat_id][0]["mystic"] = run
+                    db[chat_id][0]["markup"] = "tg"
+                except:
+                    pass
                 
             else:
                 if video:
@@ -585,61 +689,65 @@ class Call(PyTgCalls):
                 try:
                     await client.change_stream(chat_id, stream)
                 except:
-                    return await chat_client.send_message(
-                        original_chat_id,
-                        text=_["call_6"],
-                    )
+                    try: await chat_client.send_message(original_chat_id, text="❌ **Play failed. Auto-skipping...**")
+                    except: pass
+                    return await self.change_stream(client, chat_id) # ⏭️ AUTO-SKIP TRIGGER
+                    
                 if videoid == "telegram":
                     button = telegram_markup(_, chat_id)
-                    
                     tg_img = get_random_img(config.TELEGRAM_AUDIO_URL) if str(streamtype) == "audio" else get_random_img(config.TELEGRAM_VIDEO_URL)
 
-                    run = await chat_client.send_photo(
-                        chat_id=original_chat_id,
-                        photo=tg_img,
-                        caption=_["stream_1"].format(
-                            config.SUPPORT_CHAT, title[:23], check[0]["dur"], user
-                        ),
-                        reply_markup=InlineKeyboardMarkup(button),
-                        has_spoiler=False # Spoiler Disabled
-                    )
-                    db[chat_id][0]["mystic"] = run
-                    db[chat_id][0]["markup"] = "tg"
+                    try:
+                        run = await chat_client.send_photo(
+                            chat_id=original_chat_id,
+                            photo=tg_img,
+                            caption=_["stream_1"].format(
+                                config.SUPPORT_CHAT, title[:23], db[chat_id][0]["dur"], user
+                            ),
+                            reply_markup=InlineKeyboardMarkup(button),
+                            has_spoiler=False 
+                        )
+                        db[chat_id][0]["mystic"] = run
+                        db[chat_id][0]["markup"] = "tg"
+                    except: pass
                     
                 elif videoid == "soundcloud":
                     button = telegram_markup(_, chat_id)
-                    run = await chat_client.send_photo(
-                        chat_id=original_chat_id,
-                        photo=get_random_img(config.SOUNCLOUD_IMG_URL),
-                        caption=_["stream_1"].format(
-                            config.SUPPORT_CHAT, title[:23], check[0]["dur"], user
-                        ),
-                        reply_markup=InlineKeyboardMarkup(button),
-                        has_spoiler=False # Spoiler Disabled
-                    )
-                    db[chat_id][0]["mystic"] = run
-                    db[chat_id][0]["markup"] = "tg"
+                    try:
+                        run = await chat_client.send_photo(
+                            chat_id=original_chat_id,
+                            photo=get_random_img(config.SOUNCLOUD_IMG_URL),
+                            caption=_["stream_1"].format(
+                                config.SUPPORT_CHAT, title[:23], db[chat_id][0]["dur"], user
+                            ),
+                            reply_markup=InlineKeyboardMarkup(button),
+                            has_spoiler=False 
+                        )
+                        db[chat_id][0]["mystic"] = run
+                        db[chat_id][0]["markup"] = "tg"
+                    except: pass
                     
                 else:
-                    # ✅ FIX: Pass all required arguments to get_thumb
                     img = await get_thumb(videoid, user_id, chat_client)
                     if not img: img = get_random_img(config.PLAYLIST_IMG_URL)
 
                     button = stream_markup(_, chat_id)
-                    run = await chat_client.send_photo(
-                        chat_id=original_chat_id,
-                        photo=img,
-                        caption=_["stream_1"].format(
-                            f"https://t.me/{app.username}?start=info_{videoid}",
-                            title[:23],
-                            check[0]["dur"],
-                            user,
-                        ),
-                        reply_markup=InlineKeyboardMarkup(button),
-                        has_spoiler=False # Spoiler Disabled
-                    )
-                    db[chat_id][0]["mystic"] = run
-                    db[chat_id][0]["markup"] = "stream"
+                    try:
+                        run = await chat_client.send_photo(
+                            chat_id=original_chat_id,
+                            photo=img,
+                            caption=_["stream_1"].format(
+                                f"https://t.me/{app.username}?start=info_{videoid}",
+                                title[:23],
+                                db[chat_id][0]["dur"],
+                                user,
+                            ),
+                            reply_markup=InlineKeyboardMarkup(button),
+                            has_spoiler=False 
+                        )
+                        db[chat_id][0]["mystic"] = run
+                        db[chat_id][0]["markup"] = "stream"
+                    except: pass
 
     async def ping(self):
         pings = []
