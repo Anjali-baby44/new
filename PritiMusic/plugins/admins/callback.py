@@ -12,6 +12,9 @@ from PritiMusic.utils.database import (
     get_active_chats, get_lang, get_upvote_count, is_active_chat,
     is_music_playing, is_nonadmin_chat, music_off, music_on, set_loop, get_assistant
 )
+# ✅ Added Autoplay database imports
+from PritiMusic.utils.database.autoplay import is_autoplay_group, add_autoplay_group, remove_autoplay_group
+
 from PritiMusic.utils.decorators.language import languageCB
 from PritiMusic.utils.formatters import seconds_to_min
 from PritiMusic.utils.inline import close_markup, stream_markup, stream_markup_timer
@@ -91,6 +94,9 @@ async def support_page_cb(client, CallbackQuery, _):
         [
             InlineKeyboardButton(text="📢 ᴜᴘᴅᴀᴛᴇs", url="https://t.me/betabot_hub"),
             InlineKeyboardButton(text="💬 sᴜᴘᴘᴏʀᴛ", url="https://t.me/betabot_support")
+        ],
+        [
+            InlineKeyboardButton(text="⌯❤️ ʙᴏᴛs ❤️⌯", url="https://t.me/betabot_hub/66")
         ],
         [
             InlineKeyboardButton(text="⌯ ʙᴀᴄᴋ ⌯", callback_data="settingsback_helper")
@@ -223,6 +229,25 @@ async def del_back_playlist(client, CallbackQuery, _):
         await set_loop(chat_id, 0)
         await CallbackQuery.message.reply_text(_["admin_5"].format(mention), reply_markup=close_markup(_))
         await CallbackQuery.message.delete()
+        
+    # ✅ AUTOPLAY BUTTON LOGIC ADDED HERE
+    elif command == "Autoplay":
+        state = await is_autoplay_group(chat_id)
+        if state:
+            await remove_autoplay_group(chat_id)
+            await CallbackQuery.answer("🔴 Autoplay Disabled!", show_alert=True)
+            await CallbackQuery.message.reply_text(
+                f"**🎧 𝐀𝐮𝐭𝐨𝐩𝐥𝐚𝐲 𝐒𝐲𝐬𝐭𝐞𝐦**\n\nGroup ke liye autoplay status ab **Disabled 🔴** hai.\n└ ʙʏ : {mention}", 
+                reply_markup=close_markup(_)
+            )
+        else:
+            await add_autoplay_group(chat_id)
+            await CallbackQuery.answer("🟢 Autoplay Enabled!", show_alert=True)
+            await CallbackQuery.message.reply_text(
+                f"**🎧 𝐀𝐮𝐭𝐨𝐩𝐥𝐚𝐲 𝐒𝐲𝐬𝐭𝐞𝐦**\n\nGroup ke liye autoplay status ab **Enabled 🟢** hai.\n└ ʙʏ : {mention}", 
+                reply_markup=close_markup(_)
+            )
+            
     elif command == "Skip" or command == "Replay":
         check = db.get(chat_id)
         if not check or len(check) == 0:
@@ -271,11 +296,23 @@ async def del_back_playlist(client, CallbackQuery, _):
 
         button = stream_markup(_, chat_id)
         img = await get_thumb(videoid, CallbackQuery.from_user.id, client)
+        
+        # ✅ BUG FIX: Safely determine the photo to prevent ValueError crash
+        final_photo = None
+        if img:
+            final_photo = img
+        else:
+            if isinstance(STREAM_IMG_URL, list):
+                final_photo = random.choice(STREAM_IMG_URL)
+            else:
+                final_photo = STREAM_IMG_URL
+
         run = await CallbackQuery.message.reply_photo(
-            photo=img if img else STREAM_IMG_URL,
+            photo=final_photo,
             caption=_["stream_1"].format(f"https://t.me/{app.username}?start=info_{videoid}", title[:23], duration, user),
             reply_markup=InlineKeyboardMarkup(button),
         )
+        
         if chat_id in db and len(db[chat_id]) > 0:
             db[chat_id][0]["mystic"] = run
             db[chat_id][0]["markup"] = "tg"
@@ -311,4 +348,4 @@ asyncio.create_task(markup_timer())
 @app.on_message(filters.video & filters.private)
 async def get_my_own_file_id(client, message):
     await message.reply_text(f"**Mera Video File ID (Isko Copy Karo):**\n`{message.video.file_id}`")
-# --- YAHAN KHATAM --
+# --- YAHAN KHATAM ---
