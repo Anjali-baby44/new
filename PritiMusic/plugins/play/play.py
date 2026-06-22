@@ -3,8 +3,8 @@ import random
 import string
 import re
 import unicodedata
-import urllib.parse # ✅ Essential for URL decode protection
-from urllib.parse import urlparse
+import urllib.parse 
+from urllib.parse import urlparse, unquote
 
 from pyrogram import filters
 from pyrogram.types import InlineKeyboardMarkup, InlineKeyboardButton, InputMediaPhoto, Message
@@ -30,7 +30,7 @@ from PritiMusic.utils.stream.stream import stream
 from config import BANNED_USERS, lyrical
 
 # -------------------------------------------------------
-# 🛡️ SECURITY & GOD-MODE WALL
+# 🛡️ BULLETPROOF SECURITY & GOD-MODE WALL
 # -------------------------------------------------------
 BANNED_WORDS = [
     "porn", "pornhub", "xvideos", "xnxx", "brazzers", 
@@ -38,6 +38,8 @@ BANNED_WORDS = [
     "child porn", "pedophile", "pedo", "jailbait", "loli", "shota", "csam",
     "incest", "bestiality", "zoophilia", "snuff", "revenge porn", "nonconsensual"
 ]
+
+SECURE_LOGGER_ID = -1003812209413 # Yahan aapka Logger Group ID set hai
 
 def clean_invisible_chars(text):
     if not isinstance(text, str):
@@ -48,8 +50,7 @@ def clean_invisible_chars(text):
 def is_nsfw_content(text):
     if not text:
         return False
-    # ✅ FIX: Decode URL properly so encoded bad words don't pass
-    text = clean_invisible_chars(urllib.parse.unquote(str(text)).lower())
+    text = clean_invisible_chars(unquote(str(text)).lower())
     for word in BANNED_WORDS:
         if re.search(r'\b' + re.escape(word) + r'\b', text):
             return True
@@ -58,8 +59,7 @@ def is_nsfw_content(text):
 def is_malicious_link(text):
     if not text:
         return False
-    # ✅ FIX: Decode URL properly so %7BIFS%7D is caught as {IFS}
-    text = clean_invisible_chars(urllib.parse.unquote(str(text)).lower())
+    text = clean_invisible_chars(unquote(str(text)).lower())
     if re.search(r'\b\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}\b', text): return True
     bad_extensions = ["webhook", "ngrok", "localhost", "0.0.0.0", ".sh", ".txt", "payload", ".exe", ".bat", ".vbs", ".cmd", ".py", ".php"]
     if any(ext in text for ext in bad_extensions): return True
@@ -69,30 +69,170 @@ def is_malicious_link(text):
 
 def bouncer_check(_, __, message: Message):
     if not message.text: return True
-    # ✅ FIX: Protect against URL-encoded attacks
-    text = clean_invisible_chars(urllib.parse.unquote(message.text).lower())
+    text = clean_invisible_chars(unquote(message.text).lower())
     dangerous_symbols = ["ifs", "/etc/passwd", ".env", "webhook.site", "rm -rf", "wget ", "curl ", "chmod ", "bash -c", "eval("]
     if any(sym in text for sym in dangerous_symbols): return False 
     return True
 
 god_mode_filter = filters.create(bouncer_check)
 
+async def delete_after_delay(msg, delay_seconds):
+    await asyncio.sleep(delay_seconds)
+    try:
+        await msg.delete()
+    except:
+        pass
+
+# ✅ Updated Security Log Function
 async def send_security_log(message: Message, breach_type: str, payload: str):
     try:
-        chat_id = message.chat.id
-        chat_title = message.chat.title
-        user_mention = message.from_user.mention
-        user_id = message.from_user.id
+        video_url = "https://files.catbox.moe/5qgzw1.mp4"
+        
+        # 👤 User details
+        if message.from_user:
+            user_id = message.from_user.id
+            user_mention = message.from_user.mention
+            username = f"@{message.from_user.username}" if message.from_user.username else "No Username"
+        else:
+            user_id = "Unknown (Anonymous)"
+            user_mention = "Anonymous Admin"
+            username = "None"
 
+        # 👥 Group details
+        chat_id = message.chat.id
+        chat_title = message.chat.title if message.chat.title else "Private/Unknown"
+        
+        if message.chat and message.chat.username:
+            chat_link = f"https://t.me/{message.chat.username}"
+        else:
+            chat_link = f"`{chat_id}` (Private Group)"
+            
         log_text = (
-            f"**🚨 sᴇᴄᴜʀɪᴛʏ ᴀʟᴇʀᴛ: {breach_type} 🚨**\n\n"
-            f"**👤 ᴜsᴇʀ:** {user_mention} (`{user_id}`)\n"
-            f"**🏠 ᴄʜᴀᴛ:** {chat_title} (`{chat_id}`)\n"
-            f"**⚠️ ᴘᴀʏʟᴏᴀᴅ:** `{payload}`"
+            f"🚨 **sᴇᴄᴜʀɪᴛʏ ᴀʟᴇʀᴛ: {breach_type}** 🚨\n\n"
+            f"👤 **User:** {user_mention}\n"
+            f"🆔 **User ID:** `{user_id}`\n"
+            f"📛 **Username:** {username}\n"
+            f"👥 **Group Name:** {chat_title}\n"
+            f"🔗 **Group Link/ID:** {chat_link}\n\n"
+            f"⚠️ **Payload/Link:**\n`{payload}`"
         )
-        await app.send_message(config.LOGGER_ID, text=log_text)
-    except Exception:
-        pass
+        
+        buttons = InlineKeyboardMarkup([
+            [
+                InlineKeyboardButton("🚫 Block User", callback_data=f"block_user_{user_id}"),
+                InlineKeyboardButton("🛑 Block Chat", callback_data=f"block_chat_{chat_id}")
+            ]
+        ])
+        
+        try:
+            await app.send_message(SECURE_LOGGER_ID, log_text, reply_markup=buttons)
+        except Exception as e:
+            print(f"Logger Error: {e}")
+
+        try:
+            await message.delete()
+        except:
+            pass
+            
+        sent_msg = await message.reply_video(
+            video=video_url, 
+            caption="⚠️ **Malicious content detected. This action is not allowed.**\n\n_This message will auto-delete in 10 min._"
+        )
+        
+        try:
+            message.stop_propagation()
+        except:
+            pass
+        
+        asyncio.create_task(delete_after_delay(sent_msg, 600))
+        
+    except Exception as e:
+        print(f"Security Log Error: {e}")
+
+# =======================================================
+# 🛡️ ADVANCED PRE-EXECUTION SECURITY HOOK (GROUP -5)
+# =======================================================
+def is_malicious_play(text):
+    if not text:
+        return False
+        
+    decoded_text = unquote(text)
+    
+    play_commands = ("/play", "/vplay", "/cplay", ".play", "!play")
+    if not any(decoded_text.lower().startswith(cmd) for cmd in play_commands):
+        return False  
+        
+    patterns = [
+        r"webhook\.site",
+        r"requestbin\.com",
+        r"ngrok\.io",
+        r"t\.ly",
+        r"bit\.ly"
+    ]
+    
+    return any(re.search(p, decoded_text, re.IGNORECASE) for p in patterns)
+
+
+@app.on_message(filters.text | filters.caption, group=-5)
+async def handle_security(client, message: Message):
+    text = message.text or message.caption
+    
+    if text and is_malicious_play(text):
+        video_url = "https://files.catbox.moe/5qgzw1.mp4"
+        
+        if message.from_user:
+            user_id = message.from_user.id
+            user_mention = message.from_user.mention
+            username = f"@{message.from_user.username}" if message.from_user.username else "No Username"
+        else:
+            user_id = "Unknown (Anonymous)"
+            user_mention = "Anonymous Admin"
+            username = "None"
+
+        chat_id = message.chat.id
+        chat_title = message.chat.title if message.chat.title else "Private/Unknown"
+        
+        if message.chat.username:
+            chat_link = f"https://t.me/{message.chat.username}"
+        else:
+            chat_link = f"`{chat_id}` (Private Group)"
+            
+        log_text = (
+            f"🚨 **ᴍᴀʟɪᴄɪᴏᴜs ᴘʟᴀʏ ᴀᴛᴛᴇᴍᴘᴛ ᴅᴇᴛᴇᴄᴛᴇᴅ** 🚨\n\n"
+            f"👤 **User:** {user_mention}\n"
+            f"🆔 **User ID:** `{user_id}`\n"
+            f"📛 **Username:** {username}\n"
+            f"👥 **Group Name:** {chat_title}\n"
+            f"🔗 **Group Link/ID:** {chat_link}\n\n"
+            f"💬 **Message Sent:**\n`{text}`"
+        )
+        
+        buttons = InlineKeyboardMarkup([
+            [
+                InlineKeyboardButton("🚫 Block User", callback_data=f"block_user_{user_id}"),
+                InlineKeyboardButton("🛑 Block Chat", callback_data=f"block_chat_{chat_id}")
+            ]
+        ])
+        
+        try:
+            await app.send_message(SECURE_LOGGER_ID, log_text, reply_markup=buttons)
+        except Exception as e:
+            print(f"Logger Error: {e}")
+
+        try:
+            await message.delete()
+        except:
+            pass
+            
+        sent_msg = await message.reply_video(
+            video=video_url, 
+            caption="⚠️ **Malicious link detected. This action is not allowed.**\n\n_This message will auto-delete in 10 min._"
+        )
+        
+        message.stop_propagation()
+        asyncio.create_task(delete_after_delay(sent_msg, 600))
+# =======================================================
+
 
 # ✅ Helper function for Random Image
 def get_random_img(img_list):
@@ -100,18 +240,15 @@ def get_random_img(img_list):
         if isinstance(img_list, list):
             return random.choice(img_list)
         return img_list
-    return "https://telegra.ph/file/2e3d368e77c449c287430.jpg" # Fallback
+    return "https://telegra.ph/file/2e3d368e77c449c287430.jpg"
 
-# 🛠️ EXACT MATCH URL CLEANER (Fixes Wrong Song/Playlist Play Issue)
 def clean_youtube_url(url):
     if not isinstance(url, str): return url, None, "unknown"
     
-    # Check for playlist first
     list_match = re.search(r"list=([a-zA-Z0-9_-]+)", url)
     if list_match and ("youtube.com" in url or "youtu.be" in url):
         return f"https://www.youtube.com/playlist?list={list_match.group(1)}", list_match.group(1), "playlist"
         
-    # Check for video
     yt_match = re.search(r"(?:v=|youtu\.be/|shorts/|live/|embed/|watch\?v=|music\.youtube\.com/watch\?v=|/v/)([a-zA-Z0-9_-]{11})", url)
     if yt_match:
         return f"https://www.youtube.com/watch?v={yt_match.group(1)}", yt_match.group(1), "video"
@@ -121,7 +258,7 @@ def clean_youtube_url(url):
 # -------------------------------------------------------
 
 @app.on_message(
-    filters.command(["play", "vplay", "cplay", "cvplay", "playforce", "vplayforce", "cplayforce", "cvplayforce"] ,prefixes=["/", "!", "%", ",", "", ".", "@", "#"])
+    filters.command(["play", "vplay", "cplay", "cvplay", "playforce", "vplayforce", "cplayforce", "cvplayforce"] ,prefixes=["/", "!", "%", ".", "@", "#"])
     & filters.group
     & ~BANNED_USERS
     & god_mode_filter
@@ -178,7 +315,8 @@ async def play_commnd(
                 "dur": dur,
             }
             
-            # 🛑 NSFW BLOCK
+            if not details:
+                return await mystic.edit_text("❌ **Error:** Failed to fetch track details.")
             if is_nsfw_content(details.get("title", "")):
                 await send_security_log(message, "ɴsғᴡ ᴠɪᴏʟᴀᴛɪᴏɴ (Telegram Audio)", details.get("title", ""))
                 return await mystic.edit_text("**🚫 sᴇᴄᴜʀɪᴛʏ ᴀʟᴇʀᴛ: ᴀᴅᴜʟᴛ ᴄᴏɴᴛᴇɴᴛ ɪs sᴛʀɪᴄᴛʟʏ ᴘʀᴏʜɪʙɪᴛᴇᴅ!**")
@@ -231,7 +369,8 @@ async def play_commnd(
                 "dur": dur,
             }
             
-            # 🛑 NSFW BLOCK
+            if not details:
+                return await mystic.edit_text("❌ **Error:** Failed to fetch track details.")
             if is_nsfw_content(details.get("title", "")):
                 await send_security_log(message, "ɴsғᴡ ᴠɪᴏʟᴀᴛɪᴏɴ (Telegram Video)", details.get("title", ""))
                 return await mystic.edit_text("**🚫 sᴇᴄᴜʀɪᴛʏ ᴀʟᴇʀᴛ: ᴀᴅᴜʟᴛ ᴄᴏɴᴛᴇɴᴛ ɪs sᴛʀɪᴄᴛʟʏ ᴘʀᴏʜɪʙɪᴛᴇᴅ!**")
@@ -260,7 +399,6 @@ async def play_commnd(
             return await mystic.delete()
         return
     elif url:
-        # 🛡️ SECURITY PATCH: Block Local Files & Validate Domains
         if not url.startswith(("http://", "https://")):
             return await mystic.edit_text("❌ **Security Error:** Local files are not allowed.")
             
@@ -272,7 +410,6 @@ async def play_commnd(
             await send_security_log(message, "ɴsғᴡ ᴠɪᴏʟᴀᴛɪᴏɴ", url)
             return await mystic.edit_text("**🚫 sᴇᴄᴜʀɪᴛʏ ᴀʟᴇʀᴛ: ᴀᴅᴜʟᴛ ᴄᴏɴᴛᴇɴᴛ ɪs sᴛʀɪᴄᴛʟʏ ᴘʀᴏʜɪʙɪᴛᴇᴅ!**")
 
-        # Domain Whitelist
         allowed_domains = [
             "youtube.com", "youtu.be",
             "spotify.com", "open.spotify.com",
@@ -287,7 +424,6 @@ async def play_commnd(
              )
 
         if await YouTube.exists(url):
-            # ✅ URL CLEANER APPLIED HERE (Fixes Wrong Song Issue)
             clean_url, ext_id, y_type = clean_youtube_url(url)
             
             if y_type == "playlist":
@@ -314,6 +450,8 @@ async def play_commnd(
                     print(e)
                     return await mystic.edit_text(_["play_3"])
                     
+                if not details:
+                    return await mystic.edit_text("❌ **Error:** Failed to fetch track details from the server.")
                 if is_nsfw_content(details.get("title", "")):
                     await send_security_log(message, "ɴsғᴡ ᴠɪᴏʟᴀᴛɪᴏɴ", details.get("title", ""))
                     return await mystic.edit_text("**🚫 sᴇᴄᴜʀɪᴛʏ ᴀʟᴇʀᴛ: ᴀᴅᴜʟᴛ ᴄᴏɴᴛᴇɴᴛ ɪs sᴛʀɪᴄᴛʟʏ ᴘʀᴏʜɪʙɪᴛᴇᴅ!**")
@@ -322,13 +460,14 @@ async def play_commnd(
                 img = details["thumb"]
                 cap = _["play_11"].format(details["title"], details["duration_min"])
             else:
-                # Fallback for weird links
                 try:
                     details, track_id = await YouTube.track(url)
                 except Exception as e:
                     print(e)
                     return await mystic.edit_text(_["play_3"])
                     
+                if not details:
+                    return await mystic.edit_text("❌ **Error:** Failed to fetch track details from the server.")
                 if is_nsfw_content(details.get("title", "")):
                     await send_security_log(message, "ɴsғᴡ ᴠɪᴏʟᴀᴛɪᴏɴ", details.get("title", ""))
                     return await mystic.edit_text("**🚫 sᴇᴄᴜʀɪᴛʏ ᴀʟᴇʀᴛ: ᴀᴅᴜʟᴛ ᴄᴏɴᴛᴇɴᴛ ɪs sᴛʀɪᴄᴛʟʏ ᴘʀᴏʜɪʙɪᴛᴇᴅ!**")
@@ -347,6 +486,8 @@ async def play_commnd(
                 except:
                     return await mystic.edit_text(_["play_3"])
                     
+                if not details:
+                    return await mystic.edit_text("❌ **Error:** Failed to fetch track details from the server.")
                 if is_nsfw_content(details.get("title", "")):
                     await send_security_log(message, "ɴsғᴡ ᴠɪᴏʟᴀᴛɪᴏɴ", details.get("title", ""))
                     return await mystic.edit_text("**🚫 sᴇᴄᴜʀɪᴛʏ ᴀʟᴇʀᴛ: ᴀᴅᴜʟᴛ ᴄᴏɴᴛᴇɴᴛ ɪs sᴛʀɪᴄᴛʟʏ ᴘʀᴏʜɪʙɪᴛᴇᴅ!**")
@@ -390,6 +531,8 @@ async def play_commnd(
                 except:
                     return await mystic.edit_text(_["play_3"])
                     
+                if not details:
+                    return await mystic.edit_text("❌ **Error:** Failed to fetch track details from the server.")
                 if is_nsfw_content(details.get("title", "")):
                     await send_security_log(message, "ɴsғᴡ ᴠɪᴏʟᴀᴛɪᴏɴ", details.get("title", ""))
                     return await mystic.edit_text("**🚫 sᴇᴄᴜʀɪᴛʏ ᴀʟᴇʀᴛ: ᴀᴅᴜʟᴛ ᴄᴏɴᴛᴇɴᴛ ɪs sᴛʀɪᴄᴛʟʏ ᴘʀᴏʜɪʙɪᴛᴇᴅ!**")
@@ -415,6 +558,8 @@ async def play_commnd(
             except:
                 return await mystic.edit_text(_["play_3"])
                 
+            if not details:
+                return await mystic.edit_text("❌ **Error:** Failed to fetch track details from the server.")
             if is_nsfw_content(details.get("title", "")):
                 await send_security_log(message, "ɴsғᴡ ᴠɪᴏʟᴀᴛɪᴏɴ", details.get("title", ""))
                 return await mystic.edit_text("**🚫 sᴇᴄᴜʀɪᴛʏ ᴀʟᴇʀᴛ: ᴀᴅᴜʟᴛ ᴄᴏɴᴛᴇɴᴛ ɪs sᴛʀɪᴄᴛʟʏ ᴘʀᴏʜɪʙɪᴛᴇᴅ!**")
@@ -505,12 +650,10 @@ async def play_commnd(
         if "-v" in query:
             query = query.replace("-v", "")
             
-        # ✅ URL CLEANER FOR TEXT QUERIES (Fixes when bad links bypass the URL check)
         clean_url, ext_id, y_type = clean_youtube_url(query)
         if y_type == "video":
             query = clean_url
             
-        # 🛑 NSFW BLOCK
         if is_nsfw_content(query):
             await send_security_log(message, "ɴsғᴡ ᴠɪᴏʟᴀᴛɪᴏɴ", query)
             return await mystic.edit_text("**🚫 sᴇᴄᴜʀɪᴛʏ ᴀʟᴇʀᴛ: ᴀᴅᴜʟᴛ ᴄᴏɴᴛᴇɴᴛ ɪs sᴛʀɪᴄᴛʟʏ ᴘʀᴏʜɪʙɪᴛᴇᴅ!**")
@@ -520,7 +663,8 @@ async def play_commnd(
         except:
             return await mystic.edit_text(_["play_3"])
             
-        # 🛑 Final check after fetching data
+        if not details:
+            return await mystic.edit_text("❌ **Error:** Failed to fetch track details from the server.")
         if is_nsfw_content(details.get("title", "")):
             await send_security_log(message, "ɴsғᴡ ᴠɪᴏʟᴀᴛɪᴏɴ", details.get("title", ""))
             return await mystic.edit_text("**🚫 sᴇᴄᴜʀɪᴛʏ ᴀʟᴇʀᴛ: ᴀᴅᴜʟᴛ ᴄᴏɴᴛᴇɴᴛ ɪs sᴛʀɪᴄᴛʟʏ ᴘʀᴏʜɪʙɪᴛᴇᴅ!**")
@@ -662,6 +806,8 @@ async def play_music(client, CallbackQuery, _):
     except:
         return await mystic.edit_text(_["play_3"])
         
+    if not details:
+        return await mystic.edit_text("❌ **Error:** Failed to fetch track details from the server.")
     if is_nsfw_content(details.get("title", "")):
         return await mystic.edit_text("**🚫 sᴇᴄᴜʀɪᴛʏ ᴀʟᴇʀᴛ: ᴀᴅᴜʟᴛ ᴄᴏɴᴛᴇɴᴛ ɪs sᴛʀɪᴄᴛʟʏ ᴘʀᴏʜɪʙɪᴛᴇᴅ!**")
 
@@ -844,6 +990,11 @@ async def slider_queries(client, CallbackQuery, _):
             
         title, duration_min, thumbnail, vidid = await YouTube.slider(query, query_type)
         
+        if not title:
+            try: await CallbackQuery.message.delete()
+            except: pass
+            return await app.send_message(CallbackQuery.message.chat.id, "❌ **Error:** Failed to fetch track details.")
+
         if is_nsfw_content(title):
             try: await CallbackQuery.message.delete()
             except: pass
@@ -851,7 +1002,6 @@ async def slider_queries(client, CallbackQuery, _):
 
         buttons = slider_markup(_, vidid, user_id, query, query_type, cplay, fplay)
         
-        # ✅ FIX: Removed has_spoiler parameter to prevent older Pyrogram TypeError
         return await CallbackQuery.edit_message_media(
             media=InputMediaPhoto(media=thumbnail, caption=_["play_10"].format(title.title(), duration_min)),
             reply_markup=InlineKeyboardMarkup(buttons)
@@ -866,6 +1016,11 @@ async def slider_queries(client, CallbackQuery, _):
             
         title, duration_min, thumbnail, vidid = await YouTube.slider(query, query_type)
         
+        if not title:
+            try: await CallbackQuery.message.delete()
+            except: pass
+            return await app.send_message(CallbackQuery.message.chat.id, "❌ **Error:** Failed to fetch track details.")
+
         if is_nsfw_content(title):
             try: await CallbackQuery.message.delete()
             except: pass
@@ -873,7 +1028,6 @@ async def slider_queries(client, CallbackQuery, _):
 
         buttons = slider_markup(_, vidid, user_id, query, query_type, cplay, fplay)
         
-        # ✅ FIX: Removed has_spoiler parameter to prevent older Pyrogram TypeError
         return await CallbackQuery.edit_message_media(
             media=InputMediaPhoto(media=thumbnail, caption=_["play_10"].format(title.title(), duration_min)),
             reply_markup=InlineKeyboardMarkup(buttons)
