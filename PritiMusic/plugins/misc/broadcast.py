@@ -19,6 +19,17 @@ from config import adminlist
 
 IS_BROADCASTING = False
 
+# ==========================================
+# 🗑️ AUTO-DELETE HELPER (26 HOURS DELAY)
+# ==========================================
+async def auto_delete_message(chat_id: int, message_id: int, client):
+    """Waits for 26 hours then deletes the specific message."""
+    await asyncio.sleep(26 * 3600)  # 26 hours in seconds (93,600 seconds)
+    try:
+        await client.delete_messages(chat_id, message_id)
+    except Exception:
+        pass
+
 
 @app.on_message(filters.command("broadcast") & SUDOERS)
 @language
@@ -47,6 +58,7 @@ async def braodcast_message(client, message, _):
     IS_BROADCASTING = True
     await message.reply_text(_["broad_1"])
 
+    # 1. BROADCAST TO CHATS
     if "-nobot" not in message.text:
         sent = 0
         pin = 0
@@ -61,6 +73,11 @@ async def braodcast_message(client, message, _):
                     if message.reply_to_message
                     else await app.send_message(i, text=query)
                 )
+                
+                # 🗑️ Trigger 26-hour auto-delete for Group broadcast
+                if m:
+                    asyncio.create_task(auto_delete_message(i, m.id, app))
+
                 if "-pin" in message.text:
                     try:
                         await m.pin(disable_notification=True)
@@ -87,6 +104,7 @@ async def braodcast_message(client, message, _):
         except:
             pass
 
+    # 2. BROADCAST TO USERS
     if "-user" in message.text:
         susr = 0
         served_users = []
@@ -100,6 +118,11 @@ async def braodcast_message(client, message, _):
                     if message.reply_to_message
                     else await app.send_message(i, text=query)
                 )
+                
+                # 🗑️ Trigger 26-hour auto-delete for User broadcast
+                if m:
+                    asyncio.create_task(auto_delete_message(i, m.id, app))
+
                 susr += 1
                 await asyncio.sleep(0.2)
             except FloodWait as fw:
@@ -114,6 +137,7 @@ async def braodcast_message(client, message, _):
         except:
             pass
 
+    # 3. BROADCAST VIA ASSISTANTS
     if "-assistant" in message.text:
         aw = await message.reply_text(_["broad_5"])
         text = _["broad_6"]
@@ -124,11 +148,16 @@ async def braodcast_message(client, message, _):
             client = await get_client(num)
             async for dialog in client.get_dialogs():
                 try:
-                    await client.forward_messages(
+                    m = await client.forward_messages(
                         dialog.chat.id, y, x
                     ) if message.reply_to_message else await client.send_message(
                         dialog.chat.id, text=query
                     )
+                    
+                    # 🗑️ Trigger 26-hour auto-delete for Assistant broadcast
+                    if m:
+                        asyncio.create_task(auto_delete_message(dialog.chat.id, m.id, client))
+
                     sent += 1
                     await asyncio.sleep(3)
                 except FloodWait as fw:
