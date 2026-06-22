@@ -1,6 +1,6 @@
 """
 Broadcast Plugin for PritiMusic
-🤞 𝐏ᴏᴡєʀєᴅ 𝐁ʏ ➛ <a href="https://t.me/betabot_hub">[˹BETA BOTS.🙂❤️˼]</a>
+🤞 𝐏ᴏᴡєʀєᴅ 𝐁ʏ ➛ ˹BETA BOTS.🙂❤️˼
 """
 
 import asyncio
@@ -19,10 +19,22 @@ from PritiMusic.utils.decorators.language import language
 from config import OWNER_ID, SUPPORT_CHAT
 
 # HTML Footer
-POWERED_BY = '\n\n🤞 𝐏ᴏᴡєʀєᴅ 𝐁ʏ ➛ <a href="https://t.me/betabot_hub">[˹BETA BOTS.🙂❤️˼]</a>'
+POWERED_BY = "🤞 𝐏ᴏᴡєʀєᴅ 𝐁ʏ ➛ ˹BETA BOTS.🙂❤️˼"
 
 # Global flag
 IS_BROADCASTING = False
+
+# ==========================================
+# 🗑️ AUTO-DELETE HELPER (26 HOURS DELAY)
+# ==========================================
+async def auto_delete_message(chat_id: int, message_id: int, client):
+    """Waits for 26 hours then deletes the specific message."""
+    await asyncio.sleep(26 * 3600)  # 26 hours in seconds (93,600 seconds)
+    try:
+        await client.delete_messages(chat_id, message_id)
+    except Exception:
+        pass
+
 
 @Client.on_message(filters.command(["broadcast"]))
 @language
@@ -32,13 +44,16 @@ async def broadcast_message(client, message: Message, _):
     bot_obj = await client.get_me()
     bot_id = bot_obj.id
     
+    # 👇 CLONE OWNER CHECK WAPAS LAGA DIYA (PREMIUM MSG HATA KAR) 👇
     try:
         clone_owner_id = await get_owner_id_from_db(bot_id)
     except:
         clone_owner_id = get_owner_id_from_db(bot_id)
         
     if message.from_user.id not in [OWNER_ID, clone_owner_id]:
-        return await message.reply_text(_["c_brod_1"].format(SUPPORT_CHAT))
+        # Premium error 'c_brod_1' ki jagah simple Not Authorized error dega
+        return await message.reply_text(_["NOT_C_OWNER"].format(SUPPORT_CHAT))
+    # 👆 YAHAN TAK 👆
 
     if IS_BROADCASTING:
         return await message.reply_text("⏳ **Broadcast is already running. Please wait.**")
@@ -77,6 +92,10 @@ async def broadcast_message(client, message: Message, _):
                     else:
                         m = await client.send_message(chat_id, text=query_to_send)
                     
+                    # 🗑️ Trigger 26-hour auto-delete for Group broadcast
+                    if m:
+                        asyncio.create_task(auto_delete_message(chat_id, m.id, client))
+                    
                     if "-pin" in message.text or "-pinloud" in message.text:
                         try:
                             msg_obj = m[0] if isinstance(m, list) else m
@@ -91,7 +110,7 @@ async def broadcast_message(client, message: Message, _):
                 except Exception:
                     continue
             await message.reply_text(
-                _["broad_3"].format(sent, pin_count) + POWERED_BY, 
+                _["broad_3"].format(sent, pin_count) + f"\n\n{POWERED_BY}", 
                 parse_mode=ParseMode.HTML, 
                 disable_web_page_preview=True
             )
@@ -105,9 +124,14 @@ async def broadcast_message(client, message: Message, _):
                 try:
                     user_id = int(user["user_id"])
                     if message.reply_to_message:
-                        await client.forward_messages(user_id, message.chat.id, message.reply_to_message.id)
+                        m = await client.forward_messages(user_id, message.chat.id, message.reply_to_message.id)
                     else:
-                        await client.send_message(user_id, text=query_to_send)
+                        m = await client.send_message(user_id, text=query_to_send)
+                        
+                    # 🗑️ Trigger 26-hour auto-delete for User broadcast
+                    if m:
+                        asyncio.create_task(auto_delete_message(user_id, m.id, client))
+                        
                     susr += 1
                     await asyncio.sleep(0.2)
                 except FloodWait as fw:
@@ -115,7 +139,7 @@ async def broadcast_message(client, message: Message, _):
                 except Exception:
                     pass
             await message.reply_text(
-                _["broad_4"].format(susr) + POWERED_BY, 
+                _["broad_4"].format(susr) + f"\n\n{POWERED_BY}", 
                 parse_mode=ParseMode.HTML, 
                 disable_web_page_preview=True
             )
