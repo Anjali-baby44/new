@@ -46,6 +46,7 @@ counter = {}
 FORCE_JOIN_LINKS = [
     "https://t.me/betabot_hub",
     "https://t.me/betabot_support",
+    "https://t.me/sukoon_s",
 ]
 
 # ✅ Helper for Random Image
@@ -454,32 +455,40 @@ class Call(PyTgCalls):
                         }
                         search_query = random.choice(lang_pools.get(detected_lang, lang_pools["Hindi"]))
 
+                    # ✅ YOUTUBE.DETAILS FIX APPLIED HERE
                     try:
-                        recommendation = await YouTube.autoplay(last_vidid=last_vidid, title=search_query, max_duration=900)
-                        if recommendation:
+                        (
+                            auto_title,
+                            auto_duration_min,
+                            auto_duration_sec,
+                            auto_thumbnail,
+                            auto_vidid,
+                        ) = await YouTube.details(search_query, True)
+
+                        if auto_title:
                             db[chat_id].append({
-                                "title": str(recommendation.get("title", "Unknown Title")),
-                                "dur": recommendation.get("duration_min", "0:00"),
+                                "title": str(auto_title),
+                                "dur": str(auto_duration_min),
                                 "streamtype": popped.get("streamtype", "audio") if popped else "audio",
                                 "by": "Autoplay 🟢",
                                 "user_id": 0,
                                 "chat_id": chat_id,
-                                "file": f"vid_{recommendation.get('vidid', '')}",
-                                "vidid": str(recommendation.get("vidid", "")),
-                                "seconds": recommendation.get("duration_sec", 0),
-                                "old_dur": recommendation.get("duration_min", "0:00"),
+                                "file": f"vid_{auto_vidid}",
+                                "vidid": str(auto_vidid),
+                                "seconds": auto_duration_sec,
+                                "old_dur": str(auto_duration_min),
                                 "old_second": 0,
                                 "played": 0,
-                                "client": popped.get("client", app)
+                                "client": popped.get("client", app) if popped else app
                             })
                             
-                            # 📝 AUTOPLAY LOGGER ADDED HERE
+                            # 📝 AUTOPLAY LOGGER 
                             try:
                                 await app.send_message(
                                     config.LOGGER_ID,
-                                    f"**🔄 Autoplay Triggered**\n\n**Chat ID:** `{chat_id}`\n**Queued Track:** {recommendation.get('title')}\n**Language/Genre:** {detected_lang}"
+                                    f"**🔄 Autoplay Triggered**\n\n**Chat ID:** `{chat_id}`\n**Queued Track:** {auto_title}\n**Language/Genre:** {detected_lang}"
                                 )
-                            except Exception as e:
+                            except Exception:
                                 pass
 
                     except Exception as e:
