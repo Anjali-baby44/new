@@ -3,7 +3,7 @@ import random
 import math
 from pyrogram.types import CallbackQuery, InputMediaPhoto, InputMediaVideo, InlineKeyboardButton, InlineKeyboardMarkup
 from pyrogram import filters
-from pyrogram.errors import WebpageMediaEmpty
+from pyrogram.errors import WebpageMediaEmpty, MessageNotModified
 
 from PritiMusic import YouTube, app
 from PritiMusic.core.call import Lucky
@@ -45,19 +45,25 @@ async def settings_back_helper(client, CallbackQuery, _):
     else:
         img = START_IMG_URL
 
-    await CallbackQuery.edit_message_media(
-        media=InputMediaPhoto(
-            media=img,
-            caption=_["start_2"].format(CallbackQuery.from_user.mention, app.mention)
-        ),
-        reply_markup=InlineKeyboardMarkup(private_panel(_))
-    )
+    try:
+        await CallbackQuery.edit_message_media(
+            media=InputMediaPhoto(
+                media=img,
+                caption=_["start_2"].format(CallbackQuery.from_user.mention, app.mention)
+            ),
+            reply_markup=InlineKeyboardMarkup(private_panel(_))
+        )
+    except MessageNotModified:
+        pass
 
 # --- CLONE PAGE ---
 @app.on_callback_query(filters.regex("clone_page") & ~BANNED_USERS)
 @languageCB
 async def clone_page_cb(client, CallbackQuery, _):
-    await CallbackQuery.answer()
+    try:
+        await CallbackQuery.answer()
+    except: pass
+    
     clone_text = (
         "**ᴍᴀᴋᴇ ʏᴏᴜʀ ᴏᴡɴ ᴍᴜsɪᴄ ʙᴏᴛ ᴡᴀᴛᴄʜɪɴɢ ᴛʜᴇ ᴠɪᴅᴇᴏ ᴄᴀʀᴇғᴜʟʟʏ.**\n\n"
         "<blockquote><b><u>ᴄʟᴏɴᴇ ᴄᴏᴍᴍᴀɴᴅs :</u></b>\n\n"
@@ -67,23 +73,30 @@ async def clone_page_cb(client, CallbackQuery, _):
         "/rmbot – <b>ᴅᴇʟᴇᴛᴇ ʏᴏᴜʀ ᴄʟᴏɴᴇᴅ ʙᴏᴛ.</b>\n\n"
         "/mybot – <b>ᴄʜᴇᴄᴋ ᴛʜᴇ ʙᴏᴛs ʏᴏᴜ'ᴠᴇ ᴄʟᴏɴᴇᴅ.</b></blockquote>"
     )
-    await CallbackQuery.edit_message_media(
-        media=InputMediaPhoto(
-            media="https://files.catbox.moe/10zwqs.jpg", 
-            caption=clone_text
-        ),
-        reply_markup=InlineKeyboardMarkup(
-            [
-                [InlineKeyboardButton(text="⌯ ʙᴀᴄᴋ ⌯", callback_data="settingsback_helper")]
-            ]
+    
+    try:
+        await CallbackQuery.edit_message_media(
+            media=InputMediaPhoto(
+                media="https://files.catbox.moe/10zwqs.jpg", 
+                caption=clone_text
+            ),
+            reply_markup=InlineKeyboardMarkup(
+                [
+                    [InlineKeyboardButton(text="⌯ ʙᴀᴄᴋ ⌯", callback_data="settingsback_helper")]
+                ]
+            )
         )
-    )
+    except MessageNotModified:
+        pass
 
 # --- SUPPORT PAGE ---
 @app.on_callback_query(filters.regex("support_page") & ~BANNED_USERS)
 @languageCB
 async def support_page_cb(client, CallbackQuery, _):
-    await CallbackQuery.answer()
+    try:
+        await CallbackQuery.answer()
+    except: pass
+    
     support_text = (
         "**✨ ᴡᴇʟᴄᴏᴍᴇ ᴛᴏ ᴛʜᴇ sᴜᴘᴘᴏʀᴛ ᴍᴇɴᴜ ✨**\n\n"
         "ɪғ ʏᴏᴜ ɴᴇᴇᴅ ᴀɴʏ ʜᴇʟᴘ ʀᴇɢᴀʀᴅɪɴɢ ᴛʜᴇ ʙᴏᴛ ᴏʀ ᴡᴀɴᴛ ᴛᴏ ʀᴇᴘᴏʀᴛ ᴀ ʙᴜɢ, "
@@ -103,13 +116,16 @@ async def support_page_cb(client, CallbackQuery, _):
         ]
     ]
 
-    await CallbackQuery.edit_message_media(
-        media=InputMediaPhoto(
-            media="https://files.catbox.moe/10zwqs.jpg", 
-            caption=support_text
-        ),
-        reply_markup=InlineKeyboardMarkup(custom_support_buttons)
-    )
+    try:
+        await CallbackQuery.edit_message_media(
+            media=InputMediaPhoto(
+                media="https://files.catbox.moe/10zwqs.jpg", 
+                caption=support_text
+            ),
+            reply_markup=InlineKeyboardMarkup(custom_support_buttons)
+        )
+    except MessageNotModified:
+        pass
 
 # --- SOURCE PAGE (UPDATED TO PHOTO) ---
 @app.on_callback_query(filters.regex("gib_source"))
@@ -131,6 +147,8 @@ async def gib_repo_callback(_, callback_query):
                 ]
             ),
         )
+    except MessageNotModified:
+        pass
     except Exception as e:
         await callback_query.answer(f"Error: {str(e)}", show_alert=True)
 
@@ -186,11 +204,19 @@ async def del_back_playlist(client, CallbackQuery, _):
                 exists = confirmer[chat_id][CallbackQuery.message.id]
                 current = db[chat_id][0]
                 if current["vidid"] != exists["vidid"] or current["file"] != exists["file"]:
-                    return await CallbackQuery.edit_message_text(_["admin_35"])
+                    try:
+                        return await CallbackQuery.edit_message_text(_["admin_35"])
+                    except MessageNotModified:
+                        return
             except:
-                return await CallbackQuery.edit_message_text(_["admin_36"])
+                try:
+                    return await CallbackQuery.edit_message_text(_["admin_36"])
+                except MessageNotModified:
+                    return
             try:
                 await CallbackQuery.edit_message_text(_["admin_37"].format(upvote))
+            except MessageNotModified:
+                pass
             except:
                 pass
             command = counter
@@ -202,7 +228,10 @@ async def del_back_playlist(client, CallbackQuery, _):
                 await CallbackQuery.answer(_["admin_39"], show_alert=True)
             upl = InlineKeyboardMarkup([[InlineKeyboardButton(text=f"👍 {get_upvotes}", callback_data=f"ADMIN  UpVote|{chat_id}_{counter}")]])
             await CallbackQuery.answer(_["admin_40"], show_alert=True)
-            return await CallbackQuery.edit_message_reply_markup(reply_markup=upl)
+            try:
+                return await CallbackQuery.edit_message_reply_markup(reply_markup=upl)
+            except MessageNotModified:
+                return
     else:
         is_non_admin = await is_nonadmin_chat(CallbackQuery.message.chat.id)
         if not is_non_admin:
@@ -259,7 +288,10 @@ async def del_back_playlist(client, CallbackQuery, _):
                 popped = check.pop(0)
                 if popped: await auto_clean(popped)
                 if not check:
-                    await CallbackQuery.edit_message_text(txt)
+                    try:
+                        await CallbackQuery.edit_message_text(txt)
+                    except MessageNotModified:
+                        pass
                     await CallbackQuery.message.reply_text(_["admin_6"].format(mention, CallbackQuery.message.chat.title), reply_markup=close_markup(_))
                     return await Lucky.stop_stream(chat_id)
             except:
@@ -316,7 +348,11 @@ async def del_back_playlist(client, CallbackQuery, _):
         if chat_id in db and len(db[chat_id]) > 0:
             db[chat_id][0]["mystic"] = run
             db[chat_id][0]["markup"] = "tg"
-        await CallbackQuery.edit_message_text(txt, reply_markup=close_markup(_))
+            
+        try:
+            await CallbackQuery.edit_message_text(txt, reply_markup=close_markup(_))
+        except MessageNotModified:
+            pass
 
 async def markup_timer():
     while not await asyncio.sleep(7):
@@ -339,7 +375,10 @@ async def markup_timer():
                 try:
                     buttons = stream_markup_timer(_, chat_id, seconds_to_min(playing[0]["played"]), playing[0]["dur"])
                     await mystic.edit_reply_markup(reply_markup=InlineKeyboardMarkup(buttons))
-                except: continue
+                except MessageNotModified: 
+                    continue
+                except: 
+                    continue
             except: continue
 
 asyncio.create_task(markup_timer()) 
