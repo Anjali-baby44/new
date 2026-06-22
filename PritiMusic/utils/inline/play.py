@@ -4,18 +4,42 @@ from PritiMusic import app
 import config
 from PritiMusic.utils.formatters import time_to_seconds
 
-# Import your styled buttons here
 from button import styled_button, ButtonStyle
 
 
-# Helper for the Clone button
-def clone_button():
+# ==========================================
+# 📊 DYNAMIC PROGRESS BAR HELPER
+# ==========================================
+def get_bar(played, dur):
+    played_sec = time_to_seconds(played)
+    duration_sec = time_to_seconds(dur)
+    total_blocks = 10
+    filled_blocks = int((played_sec / duration_sec) * total_blocks) if duration_sec > 0 else 0
+    bar = "▰" * filled_blocks + "▱" * (total_blocks - filled_blocks)
+    return f"{played} {bar} {dur}"
+
+# ==========================================
+# 🔘 BUTTON HELPERS
+# ==========================================
+def autoplay_btn(chat_id):
     return styled_button(
-        text="✯ CLONE NOW ✯", 
-        url="https://t.me/clone_MUSICrobot",
+        text="❖ 𝐀ᴜᴛᴏ𝐏ʟᴀʏ ❖", 
+        callback_data=f"ADMIN Autoplay|{chat_id}", 
+        style=ButtonStyle.PRIMARY
+    )
+
+def add_me_btn(bot_username=None):
+    username = bot_username if bot_username else app.username
+    return styled_button(
+        text="『 𝐀ᴅᴅ 𝐌є 𝐁ᴀʙʏ 』", 
+        url=f"https://t.me/{username}?startgroup=true", 
         style=ButtonStyle.SUCCESS
     )
 
+
+# ==========================================
+# 🎛️ INLINE KEYBOARD MARKUPS
+# ==========================================
 
 def track_markup(_, videoid, user_id, channel, fplay):
     buttons = [
@@ -31,8 +55,8 @@ def track_markup(_, videoid, user_id, channel, fplay):
                 style=ButtonStyle.SUCCESS
             ),
         ],
-        [clone_button()],
         [
+            add_me_btn(),
             styled_button(
                 text=_["CLOSE_BUTTON"],
                 callback_data=f"forceclose {videoid}|{user_id}",
@@ -44,41 +68,10 @@ def track_markup(_, videoid, user_id, channel, fplay):
 
 
 def stream_markup_timer(_, chat_id, played, dur):
-    played_sec = time_to_seconds(played)
-    duration_sec = time_to_seconds(dur)
-    
-    if duration_sec == 0:
-        percentage = 0
-    else:
-        percentage = (played_sec / duration_sec) * 100
-        
-    umm = math.floor(percentage)
-
-    if 0 <= umm <= 10:
-        bar = "◉—————————"
-    elif 10 < umm <= 20:
-        bar = "—◉————————"
-    elif 20 < umm <= 30:
-        bar = "——◉———————"
-    elif 30 < umm <= 40:
-        bar = "———◉——————"
-    elif 40 < umm <= 50:
-        bar = "————◉—————"
-    elif 50 < umm <= 60:
-        bar = "—————◉————"
-    elif 60 < umm <= 70:
-        bar = "——————◉———"
-    elif 70 < umm <= 80:
-        bar = "———————◉——"
-    elif 80 < umm <= 90:
-        bar = "————————◉—"
-    else:
-        bar = "—————————◉"
-
     buttons = [
         [
             styled_button(
-                text=f"{played} {bar} {dur}",
+                text=get_bar(played, dur),
                 callback_data="GetTimer",
                 style=ButtonStyle.PRIMARY
             )
@@ -88,8 +81,11 @@ def stream_markup_timer(_, chat_id, played, dur):
             styled_button(text="II", callback_data=f"ADMIN Pause|{chat_id}", style=ButtonStyle.DANGER),
             styled_button(text="‣‣I", callback_data=f"ADMIN Skip|{chat_id}", style=ButtonStyle.PRIMARY),
         ],
-        [clone_button()],
         [
+            autoplay_btn(chat_id)
+        ],
+        [
+            add_me_btn(),
             styled_button(text=_["CLOSE_BUTTON"], callback_data="close", style=ButtonStyle.DANGER),
         ]
     ]
@@ -104,6 +100,10 @@ def stream_markup(_, chat_id):
             styled_button(text="‣‣I", callback_data=f"ADMIN Skip|{chat_id}", style=ButtonStyle.PRIMARY),
         ],
         [
+            autoplay_btn(chat_id)
+        ],
+        [
+            add_me_btn(),
             styled_button(text=_["CLOSE_BUTTON"], callback_data="close", style=ButtonStyle.DANGER),
         ]
     ]
@@ -124,8 +124,8 @@ def playlist_markup(_, videoid, user_id, ptype, channel, fplay):
                 style=ButtonStyle.SUCCESS
             ),
         ],
-        [clone_button()],
         [
+            add_me_btn(),
             styled_button(
                 text=_["CLOSE_BUTTON"],
                 callback_data=f"forceclose {videoid}|{user_id}",
@@ -145,8 +145,8 @@ def livestream_markup(_, videoid, user_id, mode, channel, fplay):
                 style=ButtonStyle.SUCCESS
             ),
         ],
-        [clone_button()],
         [
+            add_me_btn(),
             styled_button(
                 text=_["CLOSE_BUTTON"],
                 callback_data=f"forceclose {videoid}|{user_id}",
@@ -179,17 +179,19 @@ def slider_markup(_, videoid, user_id, query, query_type, channel, fplay):
                 style=ButtonStyle.PRIMARY
             ),
             styled_button(
-                text=_["CLOSE_BUTTON"],
-                callback_data=f"forceclose {query}|{user_id}",
-                style=ButtonStyle.DANGER
-            ),
-            styled_button(
                 text="▷",
                 callback_data=f"slider F|{query_type}|{query}|{user_id}|{channel}|{fplay}",
                 style=ButtonStyle.PRIMARY
             ),
         ],
-        [clone_button()],
+        [
+            add_me_btn(),
+            styled_button(
+                text=_["CLOSE_BUTTON"],
+                callback_data=f"forceclose {query}|{user_id}",
+                style=ButtonStyle.DANGER
+            ),
+        ],
     ]
     return buttons
 
@@ -197,26 +199,23 @@ def slider_markup(_, videoid, user_id, query, query_type, channel, fplay):
 def telegram_markup(_, chat_id):
     buttons = [
         [
+            autoplay_btn(chat_id)
+        ],
+        [
+            add_me_btn(),
             styled_button(
                 text="Next",
                 callback_data=f"PanelMarkup None|{chat_id}",
                 style=ButtonStyle.PRIMARY
             ),
             styled_button(text=_["CLOSEMENU_BUTTON"], callback_data="close", style=ButtonStyle.DANGER),
-        ],
+        ]
     ]
     return buttons
 
 
 def queue_markup(_, videoid, chat_id):
     buttons = [
-        [
-            styled_button(
-                text=_["S_B_3"],
-                url=f"https://t.me/{app.username}?startgroup=true",
-                style=ButtonStyle.SUCCESS
-            ),
-        ],
         [
             styled_button(
                 text="II ᴘᴀᴜsᴇ",
@@ -235,8 +234,11 @@ def queue_markup(_, videoid, chat_id):
                 text="ʀᴇᴘʟᴀʏ ↺", callback_data=f"ADMIN Replay|{chat_id}", style=ButtonStyle.PRIMARY
             ),
         ],
-        [clone_button()],
         [
+            autoplay_btn(chat_id)
+        ],
+        [
+            add_me_btn(),
             styled_button(
                 text="ᴍᴏʀᴇ",
                 callback_data=f"PanelMarkup None|{chat_id}",
@@ -250,19 +252,15 @@ def queue_markup(_, videoid, chat_id):
 def stream_markup2(_, chat_id):
     buttons = [
         [
-            styled_button(
-                text=_["S_B_3"],
-                url=f"https://t.me/{app.username}?startgroup=true",
-                style=ButtonStyle.SUCCESS
-            ),
-        ],
-        [
             styled_button(text="▷", callback_data=f"ADMIN Resume|{chat_id}", style=ButtonStyle.SUCCESS),
             styled_button(text="II", callback_data=f"ADMIN Pause|{chat_id}", style=ButtonStyle.DANGER),
             styled_button(text="‣‣I", callback_data=f"ADMIN Skip|{chat_id}", style=ButtonStyle.PRIMARY),
         ],
-        [clone_button()],
         [
+            autoplay_btn(chat_id)
+        ],
+        [
+            add_me_btn(),
             styled_button(text=_["CLOSEMENU_BUTTON"], callback_data="close", style=ButtonStyle.DANGER),
         ],
     ]
@@ -270,41 +268,10 @@ def stream_markup2(_, chat_id):
 
 
 def stream_markup_timer2(_, chat_id, played, dur):
-    played_sec = time_to_seconds(played)
-    duration_sec = time_to_seconds(dur)
-    
-    if duration_sec == 0:
-        percentage = 0
-    else:
-        percentage = (played_sec / duration_sec) * 100
-        
-    umm = math.floor(percentage)
-
-    if 0 <= umm <= 10:
-        bar = "◉——————————"
-    elif 10 < umm <= 20:
-        bar = "—◉—————————"
-    elif 20 < umm <= 30:
-        bar = "——◉————————"
-    elif 30 < umm <= 40:
-        bar = "———◉———————"
-    elif 40 < umm <= 50:
-        bar = "————◉——————"
-    elif 50 < umm <= 60:
-        bar = "—————◉—————"
-    elif 60 < umm <= 70:
-        bar = "——————◉————"
-    elif 70 < umm <= 80:
-        bar = "———————◉———"
-    elif 80 < umm <= 90:
-        bar = "————————◉——"
-    else:
-        bar = "——————————◉"
-
     buttons = [
         [
             styled_button(
-                text=f"{played} {bar} {dur}",
+                text=get_bar(played, dur),
                 callback_data="GetTimer",
                 style=ButtonStyle.PRIMARY
             )
@@ -314,8 +281,11 @@ def stream_markup_timer2(_, chat_id, played, dur):
             styled_button(text="II", callback_data=f"ADMIN Pause|{chat_id}", style=ButtonStyle.DANGER),
             styled_button(text="‣‣I", callback_data=f"ADMIN Skip|{chat_id}", style=ButtonStyle.PRIMARY),
         ],
-        [clone_button()],
         [
+            autoplay_btn(chat_id)
+        ],
+        [
+            add_me_btn(),
             styled_button(text=_["CLOSEMENU_BUTTON"], callback_data="close", style=ButtonStyle.DANGER),
         ],
     ]
@@ -324,13 +294,6 @@ def stream_markup_timer2(_, chat_id, played, dur):
 
 def panel_markup_1(_, videoid, chat_id):
     buttons = [
-        [
-            styled_button(
-                text=_["S_B_3"],
-                url=f"https://t.me/{app.username}?startgroup=true",
-                style=ButtonStyle.SUCCESS
-            ),
-        ],
         [
             styled_button(
                 text="sᴜғғʟᴇ",
@@ -351,8 +314,11 @@ def panel_markup_1(_, videoid, chat_id):
                 style=ButtonStyle.PRIMARY
             ),
         ],
-        [clone_button()],
         [
+            autoplay_btn(chat_id)
+        ],
+        [
+            add_me_btn(),
             styled_button(
                 text="ʜᴏᴍᴇ",
                 callback_data=f"Pages Back|2|{videoid}|{chat_id}",
@@ -370,13 +336,6 @@ def panel_markup_1(_, videoid, chat_id):
 
 def panel_markup_2(_, videoid, chat_id):
     buttons = [
-        [
-            styled_button(
-                text=_["S_B_3"],
-                url=f"https://t.me/{app.username}?startgroup=true",
-                style=ButtonStyle.SUCCESS
-            ),
-        ],
         [
             styled_button(
                 text="🕒 0.5x",
@@ -406,50 +365,14 @@ def panel_markup_2(_, videoid, chat_id):
                 style=ButtonStyle.PRIMARY
             ),
         ],
-        [clone_button()], 
         [
+            autoplay_btn(chat_id)
+        ],
+        [
+            add_me_btn(),
             styled_button(
                 text="ʙᴀᴄᴋ",
                 callback_data=f"Pages Back|1|{videoid}|{chat_id}",
-                style=ButtonStyle.PRIMARY
-            ),
-        ],
-    ]
-    return buttons
-
-
-def panel_markup_5(_, videoid, chat_id):
-    buttons = [
-        [
-            styled_button(
-                text=_["S_B_3"],
-                url=f"https://t.me/{app.username}?startgroup=true",
-                style=ButtonStyle.SUCCESS
-            ),
-        ],
-        [
-            styled_button(text="ᴘᴀᴜsᴇ", callback_data=f"ADMIN Pause|{chat_id}", style=ButtonStyle.DANGER),
-            styled_button(text="sᴛᴏᴘ", callback_data=f"ADMIN Stop|{chat_id}", style=ButtonStyle.DANGER),
-            styled_button(text="sᴋɪᴘ", callback_data=f"ADMIN Skip|{chat_id}", style=ButtonStyle.PRIMARY),
-        ],
-        [
-            styled_button(
-                text="ʀᴇsᴜᴍᴇ", callback_data=f"ADMIN Resume|{chat_id}", style=ButtonStyle.SUCCESS
-            ),
-            styled_button(
-                text="ʀᴇᴘʟᴀʏ", callback_data=f"ADMIN Replay|{chat_id}", style=ButtonStyle.PRIMARY
-            ),
-        ],
-        [clone_button()],
-        [
-            styled_button(
-                text="ʜᴏᴍᴇ",
-                callback_data=f"MainMarkup {videoid}|{chat_id}",
-                style=ButtonStyle.PRIMARY
-            ),
-            styled_button(
-                text="ɴᴇxᴛ",
-                callback_data=f"Pages Forw|1|{videoid}|{chat_id}",
                 style=ButtonStyle.PRIMARY
             ),
         ],
@@ -488,8 +411,11 @@ def panel_markup_3(_, videoid, chat_id):
                 style=ButtonStyle.PRIMARY
             ),
         ],
-        [clone_button()],
         [
+            autoplay_btn(chat_id)
+        ],
+        [
+            add_me_btn(),
             styled_button(
                 text="ʙᴀᴄᴋ",
                 callback_data=f"Pages Back|2|{videoid}|{chat_id}",
@@ -501,41 +427,10 @@ def panel_markup_3(_, videoid, chat_id):
 
 
 def panel_markup_4(_, vidid, chat_id, played, dur):
-    played_sec = time_to_seconds(played)
-    duration_sec = time_to_seconds(dur)
-    
-    if duration_sec == 0:
-        percentage = 0
-    else:
-        percentage = (played_sec / duration_sec) * 100
-        
-    umm = math.floor(percentage)
-
-    if 0 <= umm <= 10:
-        bar = "◉——————————"
-    elif 10 < umm <= 20:
-        bar = "—◉—————————"
-    elif 20 < umm <= 30:
-        bar = "——◉————————"
-    elif 30 < umm <= 40:
-        bar = "———◉———————"
-    elif 40 < umm <= 50:
-        bar = "————◉——————"
-    elif 50 < umm <= 60:
-        bar = "—————◉—————"
-    elif 60 < umm <= 70:
-        bar = "——————◉————"
-    elif 70 < umm <= 80:
-        bar = "———————◉———"
-    elif 80 < umm <= 90:
-        bar = "————————◉——"
-    else:
-        bar = "——————————◉"
-
     buttons = [
         [
             styled_button(
-                text=f"{played} {bar} {dur}",
+                text=get_bar(played, dur),
                 callback_data="GetTimer",
                 style=ButtonStyle.PRIMARY
             )
@@ -547,6 +442,9 @@ def panel_markup_4(_, vidid, chat_id, played, dur):
                 style=ButtonStyle.DANGER
             ),
             styled_button(
+                text="▢ sᴛᴏᴘ ▢", callback_data=f"ADMIN Stop|{chat_id}", style=ButtonStyle.DANGER
+            ),
+            styled_button(
                 text="sᴋɪᴘ ‣‣I", callback_data=f"ADMIN Skip|{chat_id}", style=ButtonStyle.PRIMARY
             ),
         ],
@@ -554,12 +452,53 @@ def panel_markup_4(_, vidid, chat_id, played, dur):
             styled_button(
                 text="▷ ʀᴇsᴜᴍᴇ", callback_data=f"ADMIN Resume|{chat_id}", style=ButtonStyle.SUCCESS
             ),
+            styled_button(
+                text="ʀᴇᴘʟᴀʏ ↺", callback_data=f"ADMIN Replay|{chat_id}", style=ButtonStyle.PRIMARY
+            ),
         ],
-        [clone_button()],
         [
+            autoplay_btn(chat_id)
+        ],
+        [
+            add_me_btn(),
             styled_button(
                 text="ʜᴏᴍᴇ",
                 callback_data=f"MainMarkup {vidid}|{chat_id}",
+                style=ButtonStyle.PRIMARY
+            ),
+        ],
+    ]
+    return buttons
+
+
+def panel_markup_5(_, videoid, chat_id):
+    buttons = [
+        [
+            styled_button(text="ᴘᴀᴜsᴇ", callback_data=f"ADMIN Pause|{chat_id}", style=ButtonStyle.DANGER),
+            styled_button(text="sᴛᴏᴘ", callback_data=f"ADMIN Stop|{chat_id}", style=ButtonStyle.DANGER),
+            styled_button(text="sᴋɪᴘ", callback_data=f"ADMIN Skip|{chat_id}", style=ButtonStyle.PRIMARY),
+        ],
+        [
+            styled_button(
+                text="ʀᴇsᴜᴍᴇ", callback_data=f"ADMIN Resume|{chat_id}", style=ButtonStyle.SUCCESS
+            ),
+            styled_button(
+                text="ʀᴇᴘʟᴀʏ", callback_data=f"ADMIN Replay|{chat_id}", style=ButtonStyle.PRIMARY
+            ),
+        ],
+        [
+            autoplay_btn(chat_id)
+        ],
+        [
+            add_me_btn(),
+            styled_button(
+                text="ʜᴏᴍᴇ",
+                callback_data=f"MainMarkup {videoid}|{chat_id}",
+                style=ButtonStyle.PRIMARY
+            ),
+            styled_button(
+                text="ɴᴇxᴛ",
+                callback_data=f"Pages Forw|1|{videoid}|{chat_id}",
                 style=ButtonStyle.PRIMARY
             ),
         ],
@@ -574,9 +513,12 @@ def panel_markup_clone(_, vidid, chat_id):
             styled_button(text="II", callback_data=f"ADMIN Pause|{chat_id}", style=ButtonStyle.DANGER),
             styled_button(text="‣‣I", callback_data=f"ADMIN Skip|{chat_id}", style=ButtonStyle.PRIMARY),
         ],
-        [clone_button()],
         [
-            styled_button(text=_["CLOSE_BUTTON"], callback_data="close", style=ButtonStyle.DANGER)
+            autoplay_btn(chat_id)
         ],
+        [
+            add_me_btn(),
+            styled_button(text=_["CLOSE_BUTTON"], callback_data="close", style=ButtonStyle.DANGER)
+        ]
     ]
     return buttons
