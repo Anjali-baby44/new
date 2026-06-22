@@ -76,7 +76,7 @@ START_IMG_URL = getenv("START_IMG_URL", "https://files.catbox.moe/n22tbs.jpg").s
 HELP_IMG_URL = getenv("HELP_IMG_URL", "https://files.catbox.moe/zbl2i7.jpg").split()
 PING_IMG_URL = getenv("PING_IMG_URL", "https://files.catbox.moe/zbl2i7.jpg").split()
 
-PLAYLIST_IMG_URL = getenv("PLAYLIST_IMG_URL", "https://files.catbox.moe/aktyfo.jpg").split()
+PLAYLIST_IMG_URL = getenv("PLAYLIST_IMG_URL", "https://files.catbox.moe/6r97s4.jpg https://files.catbox.moe/huqcbp.jpg https://files.catbox.moe/gbx3h3.jpg https://files.catbox.moe/6f5azl.jpg").split()
 STATS_IMG_URL = getenv("STATS_IMG_URL", "https://files.catbox.moe/6r97s4.jpg")
 TELEGRAM_AUDIO_URL = getenv("TELEGRAM_AUDIO_URL", "https://i.ibb.co/gL3ykkyh/play-music.jpg").split()
 TELEGRAM_VIDEO_URL = getenv("TELEGRAM_VIDEO_URL", "https://i.ibb.co/gL3ykkyh/play-music.jpg").split()
