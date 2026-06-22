@@ -1,3 +1,4 @@
+from button import ButtonStyle
 from pyrogram.enums import ParseMode
 from pyrogram.types import InlineKeyboardMarkup, InlineKeyboardButton
 
