@@ -5,7 +5,8 @@ import aiofiles
 import aiohttp
 import math
 from PIL import (Image, ImageDraw, ImageEnhance, ImageFilter, ImageFont, ImageOps)
-from py_yt import VideosSearch
+# Nayi library yahan update kar di gayi hai 👇
+from youtubesearchpython.__future__ import VideosSearch
 from PritiMusic import app
 
 # --- HELPER FUNCTIONS ---
@@ -85,9 +86,12 @@ async def get_thumb(videoid, user_id, user_name):
         # Images
         yt_img_glowing, yt_offset = get_glowing_circle(bg.resize((500, 500)))
         background.paste(yt_img_glowing, (80 - yt_offset, 250 - yt_offset), yt_img_glowing)
+        
         u_photo = await download_user_photo(user_id)
         if u_photo:
-            u_img_glowing, u_offset = get_glowing_circle(Image.open(u_photo).resize((450, 450)))
+            # YAHAN CHANGE KIYA HAI: Blur value ko 6 kar diya hai 👇
+            u_img_blurred = Image.open(u_photo).resize((450, 450)).filter(ImageFilter.GaussianBlur(6))
+            u_img_glowing, u_offset = get_glowing_circle(u_img_blurred)
             background.paste(u_img_glowing, (1350 - u_offset, 250 - u_offset), u_img_glowing)
 
         # Texts
