@@ -5,7 +5,9 @@ import aiofiles
 import aiohttp
 import math
 from PIL import (Image, ImageDraw, ImageEnhance, ImageFilter, ImageFont, ImageOps)
-from py_yt import VideosSearch
+
+# Nayi library yahan update kar di gayi hai 👇
+from youtubesearchpython.__future__ import VideosSearch
 from PritiMusic import app
 from PritiMusic.utils.database import clonebotdb
 
@@ -16,17 +18,21 @@ def get_glowing_circle(image):
     img = ImageOps.fit(img, (size, size), centering=(0.5, 0.5))
     mask = Image.new("L", (size, size), 0)
     ImageDraw.Draw(mask).ellipse((0, 0, size, size), fill=255)
+    
     circular_img = Image.new("RGBA", (size, size), (0, 0, 0, 0))
     circular_img.paste(img, (0, 0), mask)
+    
     offset = 50
     glow_size = size + (offset * 2)
     glow = Image.new("RGBA", (glow_size, glow_size), (0, 0, 0, 0))
     draw_glow = ImageDraw.Draw(glow)
+    
     draw_glow.ellipse((5, 5, glow_size-5, glow_size-5), fill=(255, 255, 0, 60))
     draw_glow.ellipse((15, 15, glow_size-15, glow_size-15), fill=(255, 255, 255, 80))
     draw_glow.ellipse((25, 25, glow_size-25, glow_size-25), fill=(255, 105, 180, 150))
     draw_glow.ellipse((35, 35, glow_size-35, glow_size-35), fill=(255, 255, 255, 200))
     glow = glow.filter(ImageFilter.GaussianBlur(15))
+    
     draw_border = ImageDraw.Draw(glow)
     draw_border.ellipse((offset - 4, offset - 4, size + offset + 4, size + offset + 4), outline="white", width=8)
     glow.paste(circular_img, (offset, offset), circular_img)
@@ -40,25 +46,30 @@ async def download_user_photo(user_id):
     try:
         async for photo in app.get_chat_photos(user_id, limit=1):
             return await app.download_media(photo.file_id, file_name=f"cache/{user_id}.jpg")
-    except: return None
+    except: 
+        return None
     return None
 
 # --- MAIN THUMBNAIL FUNCTION ---
 async def get_thumb(videoid, user_id, client):
+    # Fetching Bot and Owner details
     me = await client.get_me()
-    bot_name = me.first_name.upper()
+    bot_name = me.first_name.upper() if me.first_name else "MUSIC BOT"
     bot_id = me.id
-    owner_name = "OWNER"
+    owner_name = "ADMIN"
+    
     try:
         bot_data = await clonebotdb.find_one({"bot_id": bot_id})
-        if bot_data:
+        if bot_data and bot_data.get("user_id"):
             owner = await client.get_users(bot_data.get("user_id"))
-            owner_name = owner.first_name.upper()
-    except: owner_name = "ADMIN"
+            owner_name = owner.first_name.upper() if owner.first_name else "OWNER"
+    except Exception as e: 
+        owner_name = "ADMIN"
 
     os.makedirs("cache", exist_ok=True)
     filename = f"cache/{videoid}_{bot_id}.png"
-    if os.path.isfile(filename): return filename
+    if os.path.isfile(filename): 
+        return filename
 
     results = VideosSearch(f"https://www.youtube.com/watch?v={videoid}", limit=1)
     data = await results.next()
@@ -91,12 +102,21 @@ async def get_thumb(videoid, user_id, client):
     except:
         f1 = f2 = br = f_small = ImageFont.load_default()
 
-    # --- BRANDING & TOP TEXT ---
-    draw.text((80, 50), f"BOT: {bot_name}", fill="yellow", font=br)
+    # --- BRANDING & TOP TEXT (BOT NAME & OWNER NAME) ---
+    bot_text = f"BOT: {bot_name}"
     owner_text = f"OWNER: {owner_name}"
-    # Calculate right-aligned position (approx)
-    owner_w = 400 
-    draw.text((1880 - owner_w, 50), owner_text, fill="cyan", font=br)
+    
+    # Left Aligned Bot Name
+    draw.text((80, 60), bot_text, fill="#FFFF00", font=br) # Yellow color
+    
+    # Right Aligned Owner Name (Automatically adjusts based on text length)
+    try:
+        owner_w = br.getlength(owner_text)
+    except AttributeError:
+        # Fallback for older PIL versions
+        owner_w = draw.textsize(owner_text, font=br)[0] if hasattr(draw, 'textsize') else 400
+        
+    draw.text((1840 - owner_w, 60), owner_text, fill="#00FFFF", font=br) # Cyan color
 
     # --- IMAGES ---
     yt_img_glowing, yt_offset = get_glowing_circle(bg.resize((500, 500)))
@@ -104,7 +124,9 @@ async def get_thumb(videoid, user_id, client):
     
     u_photo = await download_user_photo(user_id)
     if u_photo:
-        u_img_glowing, u_offset = get_glowing_circle(Image.open(u_photo).resize((450, 450)))
+        # Yahan par GaussianBlur(6) apply kiya gaya hai 👇
+        u_img_blurred = Image.open(u_photo).resize((450, 450)).filter(ImageFilter.GaussianBlur(6))
+        u_img_glowing, u_offset = get_glowing_circle(u_img_blurred)
         background.paste(u_img_glowing, (1350 - u_offset, 250 - u_offset), u_img_glowing)
 
     draw.text((650, 300), clear(title, 25), fill="white", font=f1)
