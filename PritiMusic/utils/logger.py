@@ -1,4 +1,5 @@
 import random
+from pyrogram import enums  # ✅ FIX: Added missing enums import for line 23
 from button import ButtonStyle
 from pyrogram.enums import ParseMode
 from pyrogram.types import InlineKeyboardMarkup, InlineKeyboardButton
@@ -6,6 +7,12 @@ from pyrogram.types import InlineKeyboardMarkup, InlineKeyboardButton
 from PritiMusic import app
 from PritiMusic.utils.database import is_on_off
 from config import LOGGER_ID
+
+# ✅ FIX: Define PREMIUM_EMOJIS (Must be Telegram Custom Emoji IDs, not standard Unicode emojis)
+PREMIUM_EMOJIS = [
+    "5206607081334906820", 
+    "5206607081334906821"
+]
 
 # ✅ NEW: Add/Remove Picture URL
 ADD_REMOVE_PIC = "https://files.catbox.moe/10zwqs.jpg"
