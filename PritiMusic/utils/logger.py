@@ -1,6 +1,6 @@
+import os
 import random
-from pyrogram import enums  # ✅ FIX: Added missing enums import for line 23
-from button import ButtonStyle
+from pyrogram import enums
 from pyrogram.enums import ParseMode
 from pyrogram.types import InlineKeyboardMarkup, InlineKeyboardButton
 
@@ -8,10 +8,9 @@ from PritiMusic import app
 from PritiMusic.utils.database import is_on_off
 from config import LOGGER_ID
 
-# ✅ FIX: Define PREMIUM_EMOJIS (Must be Telegram Custom Emoji IDs, not standard Unicode emojis)
+# ✅ FIX: Changed to Standard Unicode Emojis (Custom ID numbers show as raw text in buttons)
 PREMIUM_EMOJIS = [
-    "5206607081334906820", 
-    "5206607081334906821"
+    "✨", "🔥", "🚀", "💖", "🔗", "🎉", "⚡"
 ]
 
 # ✅ NEW: Add/Remove Picture URL
@@ -67,7 +66,7 @@ async def play_logs(message, streamtype):
         # Create Button Markup
         buttons = []
         if chat_link:
-            buttons.append([InlineKeyboardButton("ɢʀᴏᴜᴘ ʟɪɴᴋ", url=chat_link, style=ButtonStyle.PRIMARY, icon_custom_emoji_id=random.choice(PREMIUM_EMOJIS))])
+            buttons.append([InlineKeyboardButton(f"{random.choice(PREMIUM_EMOJIS)} ɢʀᴏᴜᴘ ʟɪɴᴋ", url=chat_link)])
         buttons.append([InlineKeyboardButton("sᴜᴘᴘᴏʀᴛ", url="https://t.me/betabot_support")])
         
         reply_markup = InlineKeyboardMarkup(buttons)
@@ -152,7 +151,7 @@ async def clone_bot_logs(client, message, bot_mention, clone_logger_id, streamty
 """
         buttons = []
         if chat_link:
-            buttons.append([InlineKeyboardButton("ɢʀᴏᴜᴘ ʟɪɴᴋ", url=chat_link, style=ButtonStyle.PRIMARY, icon_custom_emoji_id=random.choice(PREMIUM_EMOJIS))])
+            buttons.append([InlineKeyboardButton(f"{random.choice(PREMIUM_EMOJIS)} ɢʀᴏᴜᴘ ʟɪɴᴋ", url=chat_link)])
         buttons.append([InlineKeyboardButton("sᴜᴘᴘᴏʀᴛ", url="https://t.me/betabot_support")])
         
         reply_markup = InlineKeyboardMarkup(buttons)
@@ -214,7 +213,7 @@ async def bot_added_logs(client, message, is_clone=False):
 """
         buttons = []
         if chat_link:
-            buttons.append([InlineKeyboardButton("ɢʀᴏᴜᴘ ʟɪɴᴋ", url=chat_link, style=ButtonStyle.SUCCESS, icon_custom_emoji_id=random.choice(PREMIUM_EMOJIS))])
+            buttons.append([InlineKeyboardButton(f"{random.choice(PREMIUM_EMOJIS)} ɢʀᴏᴜᴘ ʟɪɴᴋ", url=chat_link)])
         buttons.append([InlineKeyboardButton("sᴜᴘᴘᴏʀᴛ", url="https://t.me/betabot_support")])
         
         reply_markup = InlineKeyboardMarkup(buttons)
@@ -275,7 +274,7 @@ async def bot_removed_logs(client, message, is_clone=False):
 """
         buttons = []
         if chat_link:
-            buttons.append([InlineKeyboardButton("ɢʀᴏᴜᴘ ʟɪɴᴋ", url=chat_link, style=ButtonStyle.DANGER, icon_custom_emoji_id=random.choice(PREMIUM_EMOJIS))])
+            buttons.append([InlineKeyboardButton(f"{random.choice(PREMIUM_EMOJIS)} ɢʀᴏᴜᴘ ʟɪɴᴋ", url=chat_link)])
         buttons.append([InlineKeyboardButton("sᴜᴘᴘᴏʀᴛ", url="https://t.me/betabot_support")])
         
         reply_markup = InlineKeyboardMarkup(buttons)
@@ -379,7 +378,7 @@ async def autoplay_log(client, chat_id, query, is_clone=False, clone_logger_id=N
 """
     buttons = []
     if chat_link:
-        buttons.append([InlineKeyboardButton("ɢʀᴏᴜᴘ ʟɪɴᴋ", url=chat_link, style=ButtonStyle.SUCCESS, icon_custom_emoji_id=random.choice(PREMIUM_EMOJIS))])
+        buttons.append([InlineKeyboardButton(f"{random.choice(PREMIUM_EMOJIS)} ɢʀᴏᴜᴘ ʟɪɴᴋ", url=chat_link)])
     buttons.append([InlineKeyboardButton("sᴜᴘᴘᴏʀᴛ", url="https://t.me/betabot_support")])
     
     reply_markup = InlineKeyboardMarkup(buttons)
