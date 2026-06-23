@@ -4,9 +4,10 @@ import random
 import aiofiles
 import aiohttp
 import math
+import traceback
 from PIL import (Image, ImageDraw, ImageEnhance, ImageFilter, ImageFont, ImageOps)
-# Nayi library yahan update kar di gayi hai 👇
-from youtubesearchpython.__future__ import VideosSearch
+# Nayi library import update: VideosSearch ki jagah Video use karenge
+from youtubesearchpython.__future__ import Video
 from PritiMusic import app
 
 # --- HELPER FUNCTIONS ---
@@ -42,29 +43,47 @@ async def download_user_photo(user_id):
     try:
         async for photo in app.get_chat_photos(user_id, limit=1):
             return await app.download_media(photo.file_id, file_name=f"cache/{user_id}.jpg")
-    except: return None
+    except: 
+        return None
     return None
 
 # --- MAIN THUMBNAIL FUNCTION ---
-async def get_thumb(videoid, user_id, user_name):
+async def get_thumb(videoid, user_id, user_name="User"):
     os.makedirs("cache", exist_ok=True)
     final_path = f"cache/{videoid}_{user_id}.png"
-    if os.path.exists(final_path): return final_path
+    if os.path.exists(final_path): 
+        return final_path
 
     try:
-        results = VideosSearch(f"https://www.youtube.com/watch?v={videoid}", limit=1)
-        data = await results.next()
-        result = data["result"][0]
-        title = re.sub(r"\W+", " ", result["title"]).title()
-        duration = result.get("duration", "00:00")
-        views = result.get("viewCount", {}).get("short", "Unknown")
-        channel = result.get("channel", {}).get("name", "Unknown Artist")
+        # ✅ FIX 1: Direct Video fetch use kiya instead of search URL
+        data = await Video.get(f"https://www.youtube.com/watch?v={videoid}")
+        if not data:
+            print(f"Thumbnail API Error: No data found for {videoid}")
+            return None
+
+        # ✅ FIX 2: Safely parse metadata
+        title = re.sub(r"\W+", " ", data.get("title", "Unknown Title")).title()
+        duration = str(data.get("duration", "00:00") or "00:00")
         
+        view_dict = data.get("viewCount") or {}
+        views = str(view_dict.get("short", "Unknown"))
+        
+        channel_dict = data.get("channel") or {}
+        channel = str(channel_dict.get("name", "Unknown Artist"))
+        
+        thumb_url = data.get("thumbnails", [{}])[0].get("url", "")
+        if not thumb_url:
+            thumb_url = f"https://img.youtube.com/vi/{videoid}/maxresdefault.jpg"
+        else:
+            thumb_url = thumb_url.split("?")[0]
+
         async with aiohttp.ClientSession() as session:
-            async with session.get(result["thumbnails"][0]["url"].split("?")[0]) as resp:
-                f = await aiofiles.open(f"cache/temp_{videoid}.jpg", mode="wb")
-                await f.write(await resp.read())
-                await f.close()
+            async with session.get(thumb_url) as resp:
+                if resp.status != 200:
+                    print(f"Thumbnail Download Failed with status: {resp.status}")
+                    return None
+                async with aiofiles.open(f"cache/temp_{videoid}.jpg", mode="wb") as f:
+                    await f.write(await resp.read())
 
         bg = Image.open(f"cache/temp_{videoid}.jpg").convert("RGBA").resize((1920, 1080))
         background = bg.filter(ImageFilter.GaussianBlur(25)).point(lambda p: p * 0.35)
@@ -83,16 +102,19 @@ async def get_thumb(videoid, user_id, user_name):
         except:
             f1 = f2 = br = f_small = ImageFont.load_default()
 
-        # Images
+        # YouTube thumbnail glow paste
         yt_img_glowing, yt_offset = get_glowing_circle(bg.resize((500, 500)))
         background.paste(yt_img_glowing, (80 - yt_offset, 250 - yt_offset), yt_img_glowing)
         
         u_photo = await download_user_photo(user_id)
         if u_photo:
-            # YAHAN CHANGE KIYA HAI: Blur value ko 6 kar diya hai 👇
-            u_img_blurred = Image.open(u_photo).resize((450, 450)).filter(ImageFilter.GaussianBlur(6))
-            u_img_glowing, u_offset = get_glowing_circle(u_img_blurred)
-            background.paste(u_img_glowing, (1350 - u_offset, 250 - u_offset), u_img_glowing)
+            # ✅ FIX 3: Try-except to prevent corrupt user image crash
+            try:
+                u_img_blurred = Image.open(u_photo).resize((450, 450)).filter(ImageFilter.GaussianBlur(6))
+                u_img_glowing, u_offset = get_glowing_circle(u_img_blurred)
+                background.paste(u_img_glowing, (1350 - u_offset, 250 - u_offset), u_img_glowing)
+            except Exception as e:
+                print(f"Failed to process user photo for {user_id}: {e}")
 
         # Texts
         draw.text((650, 300), (title[:22] + "...") if len(title) > 22 else title, fill="white", font=f1)
@@ -103,46 +125,46 @@ async def get_thumb(videoid, user_id, user_name):
         # --- UNIFORM DYNAMIC WAVEFORM ---
         bar_count = 64; bar_width = 5; bar_gap = 12
         total_width = bar_count * bar_gap
-        # Waveform thoda upar kiya (780 se 760 kiya)
         start_x = (1920 - total_width) / 2; base_y = 760 
         
-        # Har video ka wave alag ho but x-axis par constant/barabar feel de
         random.seed(videoid) 
         for i in range(bar_count):
-            h = random.randint(15, 45) # Random heights without the swell shape
+            h = random.randint(15, 45) 
             x0 = start_x + (i * bar_gap); x1 = x0 + bar_width
             y0 = base_y - h; y1 = base_y + h
             fill_color = (255, 255, 255, 255) if i < (bar_count // 2) else (150, 150, 150, 200)
             if x1 > x0: draw.rounded_rectangle((x0, y0, x1, y1), radius=3, fill=fill_color)
 
-        # --- PROGRESS LINE & ICONS (Shifted Upwards) ---
-        line_y = base_y + 55 # Pehle +80 tha, ab thoda upar kiya
+        # --- PROGRESS LINE & ICONS ---
+        line_y = base_y + 55 
         draw.line([(start_x, line_y), (start_x + total_width, line_y)], fill=(80, 80, 80), width=1)
         draw.line([(start_x, line_y), (start_x + (total_width // 2), line_y)], fill=(255, 255, 255), width=2)
         draw.ellipse(((start_x + total_width // 2) - 8, line_y - 8, (start_x + total_width // 2) + 8, line_y + 8), fill="white")
         draw.text((start_x, line_y + 20), "00:00", fill="white", font=f_small)
         draw.text((start_x + total_width - 80, line_y + 20), duration, fill="white", font=f_small)
 
-        ctrl_y = line_y + 50 # Pehle +60 tha, play icons ko bhi aur upar kiya
+        ctrl_y = line_y + 50 
         mid_x = 960
         
-        # Play / Pause Icon
         draw.ellipse((mid_x - 30, ctrl_y - 30, mid_x + 30, ctrl_y + 30), outline="white", width=3)
         draw.polygon([(mid_x - 8, ctrl_y - 12), (mid_x + 14, ctrl_y), (mid_x - 8, ctrl_y + 12)], fill="white")
         
-        # Previous / Next Icons
         draw.ellipse((mid_x - 80, ctrl_y - 20, mid_x - 45, ctrl_y + 20), outline="white", width=2)
         draw.ellipse((mid_x + 45, ctrl_y - 20, mid_x + 80, ctrl_y + 20), outline="white", width=2)
 
-        # Branding
+        # Branding text with neon glow parameters preserved
         draw_text_with_glow(draw, (80, 975), "KavyaBots", br, (132, 224, 240), (0, 255, 255, 100))
         draw_text_with_glow(draw, (1480, 975), "THE SHIV", br, (255, 60, 160), (255, 0, 170, 100))
 
         background.convert("RGB").save(final_path, "PNG")
         return final_path
     except Exception as e:
-        print(f"Thumbnail Error: {e}")
+        # ✅ FIX 4: Detailed error tracking
+        print(f"Thumbnail Generation Failed for {videoid}: {e}")
+        traceback.print_exc()
         return None
     finally:
-        if os.path.exists(f"cache/temp_{videoid}.jpg"): os.remove(f"cache/temp_{videoid}.jpg")
-        if 'u_photo' in locals() and u_photo and os.path.exists(u_photo): os.remove(u_photo)
+        if os.path.exists(f"cache/temp_{videoid}.jpg"): 
+            os.remove(f"cache/temp_{videoid}.jpg")
+        if 'u_photo' in locals() and u_photo and os.path.exists(u_photo): 
+            os.remove(u_photo)
