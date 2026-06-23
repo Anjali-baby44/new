@@ -1,4 +1,4 @@
-import random # ✅ Added Random
+import random
 from pyrogram import filters, Client
 from pyrogram.types import InlineKeyboardMarkup, Message
 
@@ -15,6 +15,13 @@ from PritiMusic.utils.thumbnails import get_thumb
 from config import BANNED_USERS
 from PritiMusic.utils.database.clonedb import get_owner_id_from_db, get_cloned_support_chat, get_cloned_support_channel
 
+# ✅ Helper for Random Image
+def get_random_img(img_list):
+    if img_list:
+        if isinstance(img_list, list):
+            return random.choice(img_list)
+        return img_list
+    return "https://telegra.ph/file/2e3d368e77c449c287430.jpg" # Fallback
 
 @Client.on_message(
     filters.command(
@@ -52,16 +59,18 @@ async def skip(cli, message: Message, _, chat_id):
                                 return await message.reply_text(_["admin_12"])
                             if popped:
                                 await auto_clean(popped)
-                            if not check:
-                                # 🔄 AUTOPLAY TRIGGER FOR MANUAL MULTI-SKIP IN CLONES
-                                try:
-                                    await message.reply_text(
-                                        text="🔄 **Skipped to end of queue. Triggering Autoplay...**",
-                                        reply_markup=close_markup(_),
-                                    )
-                                    return await Lucky.change_stream(cli, chat_id)
-                                except:
-                                    return
+                        if not check:
+                            # 🔄 AUTOPLAY TRIGGER FOR MANUAL MULTI-SKIP IN CLONES
+                            if popped:
+                                db[chat_id].append(popped) # Backup for call.py to read
+                            try:
+                                await message.reply_text(
+                                    text="🔄 **Skipped to end of queue. Triggering Autoplay...**",
+                                    reply_markup=close_markup(_),
+                                )
+                                return await Lucky.change_stream(cli, chat_id)
+                            except:
+                                return
                     else:
                         return await message.reply_text(_["admin_11"].format(count))
                 else:
@@ -72,35 +81,32 @@ async def skip(cli, message: Message, _, chat_id):
             return await message.reply_text(_["admin_9"])
     else:
         check = db.get(chat_id)
-        popped = None
-        try:
-            popped = check.pop(0)
-            if popped:
-                await auto_clean(popped)
-            if not check:
-                # 🔄 AUTOPLAY TRIGGER FOR MANUAL SKIP ON LAST TRACK IN CLONES
-                try:
-                    await message.reply_text(
-                        text="🔄 **Queue is empty! Triggering Autoplay...**",
-                        reply_markup=close_markup(_),
-                    )
-                    return await Lucky.change_stream(cli, chat_id)
-                except:
-                    return
-        except:
-            # 🔄 AUTOPLAY TRIGGER FOR FAILSAFE IN CLONES
+        
+        # 🟢 FIX: Agar queue me sirf 1 gaana bacha hai to pop mat karo. 
+        # Sidha change_stream ko pass karo taki wo data padh ke autoplay chalu kar sake!
+        if check and len(check) == 1:
             try:
                 await message.reply_text(
-                    text="🔄 **Queue exhausted! Triggering Autoplay...**",
+                    text="🔄 **Queue is empty! Triggering Autoplay...**",
                     reply_markup=close_markup(_),
                 )
                 return await Lucky.change_stream(cli, chat_id)
             except:
                 return
-    
+
+        # Agar queue me aur bhi gaane hain, toh normally skip karo
+        popped = None
+        try:
+            popped = check.pop(0)
+            if popped:
+                await auto_clean(popped)
+        except:
+            pass
+            
     if not check:
         return
 
+    # ⏭️ IF QUEUE IS NOT EMPTY, CONTINUE WITH NEXT SONG
     queued = check[0]["file"]
     title = (check[0]["title"]).title()
     user = check[0]["by"]
@@ -115,9 +121,8 @@ async def skip(cli, message: Message, _, chat_id):
         db[chat_id][0]["speed_path"] = None
         db[chat_id][0]["speed"] = 1.0
         
-    # ✅ FIX: Safely extract user_id and user_name (accounts for Anonymous Admins)
+    # ✅ FIX: Safely extract user_id (accounts for Anonymous Admins)
     req_user_id = message.from_user.id if message.from_user else 0
-    req_user_name = message.from_user.first_name if message.from_user else "Admin"
         
     if "live_" in queued:
         n, link = await YouTube.video(videoid, True)
@@ -132,8 +137,9 @@ async def skip(cli, message: Message, _, chat_id):
         except:
             return await message.reply_text(_["call_6"])
         button = stream_markup2(_, chat_id)
-        # ✅ FIX: Added missing arguments
-        img = await get_thumb(videoid, req_user_id, req_user_name)
+        
+        # ✅ FIX: Pass 'cli' instead of user name so Clone Thumbnail logic works
+        img = await get_thumb(videoid, req_user_id, cli)
         if not img: img = get_random_img(config.PLAYLIST_IMG_URL)
         run = await message.reply_photo(
             photo=img,
@@ -168,8 +174,9 @@ async def skip(cli, message: Message, _, chat_id):
         except:
             return await mystic.edit_text(_["call_6"])
         button = stream_markup(_, chat_id)
-        # ✅ FIX: Added missing arguments
-        img = await get_thumb(videoid, req_user_id, req_user_name)
+        
+        # ✅ FIX: Pass 'cli' instead of user name
+        img = await get_thumb(videoid, req_user_id, cli)
         if not img: img = get_random_img(config.PLAYLIST_IMG_URL)
         run = await message.reply_photo(
             photo=img,
@@ -273,8 +280,8 @@ async def skip(cli, message: Message, _, chat_id):
             
         else:
             button = stream_markup(_, chat_id)
-            # ✅ FIX: Added missing arguments
-            img = await get_thumb(videoid, req_user_id, req_user_name)
+            # ✅ FIX: Pass 'cli' instead of user name
+            img = await get_thumb(videoid, req_user_id, cli)
             if not img: img = get_random_img(config.PLAYLIST_IMG_URL)
             run = await message.reply_photo(
                 photo=img,
