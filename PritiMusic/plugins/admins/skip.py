@@ -47,16 +47,18 @@ async def skip(cli, message: Message, _, chat_id):
                                 return await message.reply_text(_["admin_12"])
                             if popped:
                                 await auto_clean(popped)
-                            if not check:
-                                # 🔄 AUTOPLAY TRIGGER FOR MANUAL MULTI-SKIP
-                                try:
-                                    await message.reply_text(
-                                        text="🔄 **Skipped to end of queue. Triggering Autoplay...**",
-                                        reply_markup=close_markup(_),
-                                    )
-                                    return await Lucky.change_stream(cli, chat_id)
-                                except:
-                                    return
+                        if not check:
+                            # 🔄 AUTOPLAY FAILSAFE FOR MULTI-SKIP
+                            if popped:
+                                db[chat_id].append(popped) # Backup for call.py to read
+                            try:
+                                await message.reply_text(
+                                    text="🔄 **Skipped to end of queue. Triggering Autoplay...**",
+                                    reply_markup=close_markup(_),
+                                )
+                                return await Lucky.change_stream(cli, chat_id)
+                            except:
+                                return
                     else:
                         return await message.reply_text(_["admin_11"].format(count))
                 else:
@@ -67,32 +69,28 @@ async def skip(cli, message: Message, _, chat_id):
             return await message.reply_text(_["admin_9"])
     else:
         check = db.get(chat_id)
-        popped = None
-        try:
-            popped = check.pop(0)
-            if popped:
-                await auto_clean(popped)
-            if not check:
-                # 🔄 AUTOPLAY TRIGGER FOR MANUAL SKIP ON LAST TRACK
-                try:
-                    await message.reply_text(
-                        text="🔄 **Queue is empty! Triggering Autoplay...**",
-                        reply_markup=close_markup(_),
-                    )
-                    return await Lucky.change_stream(cli, chat_id)
-                except:
-                    return
-        except:
-            # 🔄 AUTOPLAY TRIGGER FOR FAILSAFE
+        
+        # 🟢 FIX: Agar queue me sirf 1 gaana bacha hai to pop mat karo. 
+        # Sidha change_stream ko pass karo taki wo data padh ke autoplay chalu kar sake!
+        if len(check) == 1:
             try:
                 await message.reply_text(
-                    text="🔄 **Queue exhausted! Triggering Autoplay...**",
+                    text="🔄 **Queue is empty! Triggering Autoplay...**",
                     reply_markup=close_markup(_),
                 )
                 return await Lucky.change_stream(cli, chat_id)
             except:
                 return
-    
+
+        # Agar queue me aur bhi gaane hain, toh normally skip karo
+        popped = None
+        try:
+            popped = check.pop(0)
+            if popped:
+                await auto_clean(popped)
+        except:
+            pass
+            
     # ⏭️ IF QUEUE IS NOT EMPTY, CONTINUE WITH NEXT SONG
     queued = check[0]["file"]
     title = (check[0]["title"]).title()
