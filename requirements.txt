@@ -10,7 +10,7 @@ ffmpeg-python
 gitpython
 hachoir
 heroku3
-httpx
+httpx==0.27.2
 motor
 numpy
 opencv-python-headless
